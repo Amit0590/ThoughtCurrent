@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // Add useEffect
 import {
     TextField,
     Button,
@@ -28,36 +28,42 @@ const RegistrationForm: React.FC = () => {
   const { register: registerField, handleSubmit, formState: { errors } } = useForm<RegistrationInputs>();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const { loading, error } = useSelector((state: RootState) => state.auth);
+  const { loading, isAuthenticated } = useSelector((state: RootState) => state.auth); // Remove unused `error` variable
   const [showError, setShowError] = React.useState(false);
+  const [snackbarMessage, setSnackbarMessage] = React.useState(''); // Add snackbarMessage state
 
   // Use SubmitHandler from react-hook-form
   const onSubmit: SubmitHandler<RegistrationInputs> = async (data) => {
-    // Add basic password match check (if not already present)
     if (data.password !== data.confirmPassword) {
-       // Use Snackbar instead of alert for consistency
-       setShowError(true); // Show the generic error Snackbar for now
+       setSnackbarMessage('Passwords do not match!');
+       setShowError(true);
        return;
     }
     try {
-      console.log("Attempting registration dispatch..."); // Check if this logs
-      // Dispatch the registerUser thunk and wait for it to complete (or reject)
+      console.log("[onSubmit] Attempting registration dispatch...");
       const resultAction = await dispatch(register(data));
+      console.log("[onSubmit] Dispatch completed. Result Action:", resultAction); // Keep this log
 
-      // Check if the action was fulfilled
-      if (register.fulfilled.match(resultAction)) {
-          console.log("Registration dispatch successful, navigating..."); // Check if this logs
-          navigate('/dashboard'); // Navigate only on fulfillment
-      } else {
-          // If the action was rejected, unwrap will throw, but this handles other cases
-          console.error("Registration dispatch did not fulfill:", resultAction.payload);
+      if (register.rejected.match(resultAction)) {
+          console.error("[onSubmit] Action rejected:", resultAction.payload);
+          setSnackbarMessage(resultAction.payload as string || 'Registration failed.');
           setShowError(true);
       }
-    } catch (error) { // Catch errors thrown by unwrap() on rejection
-      console.error('Registration failed in catch block:', error);
-      setShowError(true); // Show the Snackbar
+      // NOTE: Navigation is now handled by useEffect below
+    } catch (error: any) {
+      console.error('[onSubmit] Caught error during dispatch:', error);
+      setSnackbarMessage(error.message || 'An unexpected error occurred.');
+      setShowError(true);
     }
   };
+
+  // Add useEffect Hook
+  useEffect(() => {
+    if (isAuthenticated && !loading) {
+      console.log("[useEffect] isAuthenticated is true, navigating to dashboard...");
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, loading, navigate]);
 
   // Function to close the Snackbar
   const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
@@ -166,7 +172,7 @@ const RegistrationForm: React.FC = () => {
         open={showError}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar} // Use handler to close
-        message={error || 'Registration failed'} // Display error from Redux state
+        message={snackbarMessage || 'Registration failed'} // Display error from Redux state
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} // Position Snackbar
       />
     </>

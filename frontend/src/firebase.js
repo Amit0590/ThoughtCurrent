@@ -1,7 +1,7 @@
 // Import Firebase app initialization and auth modules
 import { initializeApp } from "firebase/app";
 // Import Firebase authentication functions
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth"; // Add these imports
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -34,24 +34,28 @@ export const createUser = (email, password) =>
 export const signIn = (email, password) =>
   signInWithEmailAndPassword(auth, email, password);
 
-// GoogleAuthProvider for Google Sign-in
-const googleAuthProvider = new GoogleAuthProvider();
+// Helper function for Google Sign-in with redirect
+export const signInWithGoogleRedirect = () => {
+  const provider = new GoogleAuthProvider();
+  return signInWithRedirect(auth, provider); // Initiates the redirect
+};
 
-// Helper function for Google Sign-in with popup
-export const signInWithGoogle = () => {
-  return signInWithPopup(auth, googleAuthProvider)
-    .then((result) => {
+// Helper function for handling redirect result
+export const handleRedirectResult = async () => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      // User signed in via redirect flow!
       const credential = GoogleAuthProvider.credentialFromResult(result);
       const token = credential?.accessToken;
       const user = result.user;
       return { credential, token, user };
-    }).catch((error) => {
-      const errorCode = error.code;
-      const errorMessage = error.message;
-      const email = error.customData.email;
-      const credential = GoogleAuthProvider.credentialFromError(error);
-      return { errorCode, errorMessage, email, credential };
-    });
+    }
+    return null; // No user signed in via redirect (e.g., redirect wasn't from auth flow)
+  } catch (error) {
+    console.error("Error handling redirect result:", error);
+    return { error }; // Return error info
+  }
 };
 
 // Helper function for user sign-out

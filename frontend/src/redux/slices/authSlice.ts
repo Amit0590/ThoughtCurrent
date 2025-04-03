@@ -80,6 +80,7 @@ export const register = createAsyncThunk(
   }
 );
 
+// Add loginSuccess action to authSlice reducers
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -87,6 +88,10 @@ const authSlice = createSlice({
     logout(state) {
       state.isAuthenticated = false;
       state.user = null;
+    },
+    loginSuccess(state, action) {
+      state.isAuthenticated = true;
+      state.user = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -128,6 +133,6 @@ const authSlice = createSlice({
   },
 });
 
-// Remove `loginSuccess` from the export as it does not exist in `authSlice.actions`
-export const { logout } = authSlice.actions;
+// Export loginSuccess along with logout
+export const { logout, loginSuccess } = authSlice.actions;
 export default authSlice.reducer;

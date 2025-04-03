@@ -16,8 +16,8 @@ import { useNavigate } from 'react-router-dom';
 import { login } from '../../redux/slices/authSlice';
 import { RootState, AppDispatch } from '../../redux/store';
 import GoogleIcon from '@mui/icons-material/Google';
-// Import the `signInWithGoogle` function from `firebase.js`
-import { signInWithGoogle } from '../../firebase';
+// Import the `signInWithGoogleRedirect` function from `firebase.js`
+import { signInWithGoogleRedirect } from '../../firebase';
 
 // Define the interface for react-hook-form
 interface LoginInputs {
@@ -50,34 +50,13 @@ const LoginForm: React.FC = () => {
   // Define the function to handle Google Sign-in click
   const handleGoogleSignIn = async () => {
     try {
-      // 1. Call the signInWithGoogle function from firebase.js
-      const result = await signInWithGoogle();
-
-      // Update the type check for `result` to ensure it has a `user` property
-      if ('user' in result && result.user) {
-        console.log("Google Sign-in successful:", result.user);
-
-        // Prepare user data for Redux state
-        const userPayload = {
-          id: result.user.uid,
-          email: result.user.email || '', // Ensure email is not null
-          displayName: result.user.displayName,
-        };
-
-        // Dispatch action to update Redux state
-        // Replace `loginSuccess` with a valid Redux action or remove if unnecessary
-        dispatch({ type: 'auth/loginSuccess', payload: userPayload });
-
-        // Navigate to dashboard
-        navigate('/dashboard');
-      } else {
-        console.log("Google Sign-in popup closed or no user data returned.");
-      }
-
-    } catch (error: any) {
-      // 5. Handle errors from Google Sign-in
-      console.error("Google Sign-in Error:", error);
-      setShowError(true); // Show Snackbar on error
+      console.log("Initiating Google Sign-in Redirect..."); // Log message
+      await signInWithGoogleRedirect(); // Call the redirect version
+      // No need to handle result here in the component directly with redirect flow
+      // The handleRedirectResult function in firebase.js and useEffect in App.tsx will handle the result after redirect
+    } catch (error) {
+      console.error("Error initiating Google Sign-in Redirect:", error);
+      setShowError(true); // Show Snackbar for redirect initiation errors (less common)
     }
   };
 

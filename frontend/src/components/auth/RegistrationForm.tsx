@@ -35,17 +35,26 @@ const RegistrationForm: React.FC = () => {
   const onSubmit: SubmitHandler<RegistrationInputs> = async (data) => {
     // Add basic password match check (if not already present)
     if (data.password !== data.confirmPassword) {
-       alert('Passwords do not match!'); // Or use Snackbar
+       // Use Snackbar instead of alert for consistency
+       setShowError(true); // Show the generic error Snackbar for now
        return;
     }
     try {
-      console.log("Attempting registration dispatch..."); // Add log
-      await dispatch(register(data)).unwrap(); // Use unwrap to catch rejection
-      console.log("Registration dispatch successful, navigating..."); // Add log
-      navigate('/dashboard'); // Should navigate after successful unwrap
-    } catch (rejectedValueOrSerializedError) {
-      console.error('Registration failed:', rejectedValueOrSerializedError); // Log error
-      // Error is handled by the rejected case in authSlice, setting state.error
+      console.log("Attempting registration dispatch..."); // Check if this logs
+      // Dispatch the registerUser thunk and wait for it to complete (or reject)
+      const resultAction = await dispatch(register(data));
+
+      // Check if the action was fulfilled
+      if (register.fulfilled.match(resultAction)) {
+          console.log("Registration dispatch successful, navigating..."); // Check if this logs
+          navigate('/dashboard'); // Navigate only on fulfillment
+      } else {
+          // If the action was rejected, unwrap will throw, but this handles other cases
+          console.error("Registration dispatch did not fulfill:", resultAction.payload);
+          setShowError(true);
+      }
+    } catch (error) { // Catch errors thrown by unwrap() on rejection
+      console.error('Registration failed in catch block:', error);
       setShowError(true); // Show the Snackbar
     }
   };

@@ -13,6 +13,7 @@ import {
 
 // Import the Firebase app instance
 import app from '../../firebase';
+import { signInWithGoogle } from '../../firebase';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -87,6 +88,25 @@ export const logoutAsync = createAsyncThunk('auth/logout', async (_, thunkAPI) =
   }
 });
 
+export const googleLogin = createAsyncThunk(
+  'auth/googleLogin',
+  async (_, thunkAPI) => {
+    try {
+      const result = await signInWithGoogle();
+      if (result?.user) {
+        return {
+          id: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+        };
+      }
+      throw new Error('Google sign-in failed');
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(error.message);
+    }
+  }
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -143,6 +163,23 @@ const authSlice = createSlice({
       .addCase(logoutAsync.fulfilled, (state) => {
         state.isAuthenticated = false;
         state.user = null;
+      })
+      .addCase(googleLogin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(googleLogin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = true;
+        state.user = {
+          id: action.payload.id,
+          email: action.payload.email || '',
+          displayName: action.payload.displayName ?? undefined,
+        };
+      })
+      .addCase(googleLogin.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   },
 });

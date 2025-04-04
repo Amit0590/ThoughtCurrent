@@ -13,11 +13,9 @@ import { useForm, SubmitHandler } from 'react-hook-form'; // Import useForm
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 // Import `loginSuccess` from `authSlice.ts`
-import { login } from '../../redux/slices/authSlice';
+import { login, googleLogin } from '../../redux/slices/authSlice';
 import { RootState, AppDispatch } from '../../redux/store';
 import GoogleIcon from '@mui/icons-material/Google';
-// Import the `signInWithGoogleRedirect` function from `firebase.js`
-import { signInWithGoogleRedirect } from '../../firebase';
 
 // Define the interface for react-hook-form
 interface LoginInputs {
@@ -50,13 +48,11 @@ const LoginForm: React.FC = () => {
   // Define the function to handle Google Sign-in click
   const handleGoogleSignIn = async () => {
     try {
-      console.log("Initiating Google Sign-in Redirect..."); // Log message
-      await signInWithGoogleRedirect(); // Call the redirect version
-      // No need to handle result here in the component directly with redirect flow
-      // The handleRedirectResult function in firebase.js and useEffect in App.tsx will handle the result after redirect
+      await dispatch(googleLogin()).unwrap();
+      navigate('/dashboard');
     } catch (error) {
-      console.error("Error initiating Google Sign-in Redirect:", error);
-      setShowError(true); // Show Snackbar for redirect initiation errors (less common)
+      console.error('Google Sign-in Error:', error);
+      setShowError(true);
     }
   };
 

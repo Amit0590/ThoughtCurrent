@@ -1,7 +1,7 @@
 // Import Firebase app initialization and auth modules
 import { initializeApp } from "firebase/app";
 // Import Firebase authentication functions
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, setPersistence, browserLocalPersistence } from "firebase/auth"; // Add these imports
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, setPersistence, browserLocalPersistence, signInWithPopup } from "firebase/auth"; // Add these imports
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -42,6 +42,20 @@ export const createUser = (email, password) =>
 // Helper function for user sign-in with email and password
 export const signIn = (email, password) =>
   signInWithEmailAndPassword(auth, email, password);
+
+// GoogleAuthProvider for Google Sign-in
+const googleAuthProvider = new GoogleAuthProvider();
+
+// Helper function for Google Sign-in with popup
+export const signInWithGoogle = () => {
+  return signInWithPopup(auth, googleAuthProvider)
+    .then((result) => {
+      return { user: result.user };
+    })
+    .catch((error) => {
+      throw error;
+    });
+};
 
 // Helper function for Google Sign-in with redirect
 export const signInWithGoogleRedirect = () => {

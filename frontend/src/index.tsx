@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { ThemeProvider, createTheme } from '@mui/material/styles'; // Import MUI Theme components
 import CssBaseline from '@mui/material/CssBaseline'; // Import CssBaseline
+import { BrowserRouter } from 'react-router-dom'; // Import BrowserRouter
 import store from './redux/store';
 import App from './App';
 
@@ -20,7 +21,9 @@ root.render(
     <Provider store={store}>
       <ThemeProvider theme={theme}> {/* Wrap with MUI ThemeProvider */}
         <CssBaseline /> {/* Apply baseline styles */}
-        <App />
+        <BrowserRouter> {/* Wrap App with BrowserRouter */}
+          <App />
+        </BrowserRouter>
       </ThemeProvider>
     </Provider>
   </React.StrictMode>

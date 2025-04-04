@@ -1,16 +1,18 @@
 import React from 'react';
 import { AppBar, Toolbar, Button, Box } from '@mui/material';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { useSelector, useDispatch } from 'react-redux';
-import { logout } from '../redux/slices/authSlice';
-import { RootState } from '../redux/store';
+import { logoutAsync } from '../redux/slices/authSlice'; // Import logoutAsync
+import { RootState, AppDispatch } from '../redux/store'; // Import AppDispatch
 
 const Navigation: React.FC = () => {
-  const dispatch = useDispatch();
+  const dispatch: AppDispatch = useDispatch(); // Use AppDispatch type for dispatch
+  const navigate = useNavigate(); // Initialize useNavigate
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
-  const handleLogout = () => {
-    dispatch(logout());
+  const handleLogout = async () => {
+    await dispatch(logoutAsync()); // Dispatch logoutAsync to handle Firebase sign-out
+    navigate('/login'); // Redirect to login page after logout
   };
 
   return (

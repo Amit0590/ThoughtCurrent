@@ -8,8 +8,6 @@ import {
     getAuth,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
-    // Remove unused import
-    // import { signOut } from 'firebase/auth';
     updateProfile // <-- Add this import
 } from 'firebase/auth';
 
@@ -80,7 +78,15 @@ export const register = createAsyncThunk(
   }
 );
 
-// Add loginSuccess action to authSlice reducers
+export const logoutAsync = createAsyncThunk('auth/logout', async (_, thunkAPI) => {
+  try {
+    const auth = getAuth(app); // Use Firebase auth instance
+    await auth.signOut(); // Sign out the user from Firebase
+  } catch (error: any) {
+    return thunkAPI.rejectWithValue(error.message); // Handle errors during sign-out
+  }
+});
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -91,7 +97,11 @@ const authSlice = createSlice({
     },
     loginSuccess(state, action) {
       state.isAuthenticated = true;
-      state.user = action.payload;
+      state.user = {
+        id: action.payload.uid, // Extract only serializable fields
+        email: action.payload.email,
+        displayName: action.payload.displayName,
+      };
     },
   },
   extraReducers: (builder) => {
@@ -129,6 +139,10 @@ const authSlice = createSlice({
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+      })
+      .addCase(logoutAsync.fulfilled, (state) => {
+        state.isAuthenticated = false;
+        state.user = null;
       });
   },
 });

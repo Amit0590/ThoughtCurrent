@@ -1,7 +1,7 @@
 // Import Firebase app initialization and auth modules
 import { initializeApp } from "firebase/app";
 // Import Firebase authentication functions
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth"; // Add these imports
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, setPersistence, browserLocalPersistence } from "firebase/auth"; // Add these imports
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -25,6 +25,15 @@ const app = initializeApp(firebaseConfig);
 
 // Export auth instance for use in app
 export const auth = getAuth(app); // Export auth instance
+
+// Attempt to set persistence explicitly
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log("Firebase persistence set to local.");
+  })
+  .catch((error) => {
+    console.error("Error setting Firebase persistence:", error);
+  });
 
 // Helper function for user registration with email and password
 export const createUser = (email, password) =>

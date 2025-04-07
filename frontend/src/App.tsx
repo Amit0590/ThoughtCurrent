@@ -7,6 +7,7 @@ import RegistrationForm from './components/auth/RegistrationForm';
 import Dashboard from './components/Dashboard';
 import ContentEditor from './components/ContentEditor';
 import ArticleView from './components/ArticleView';
+import ArticleList from './components/ArticleList';
 import { RootState, AppDispatch } from './redux/store';
 import { handleRedirectResult, auth } from './firebase';
 import { loginSuccess } from './redux/slices/authSlice'; // Import loginSuccess
@@ -155,6 +156,14 @@ const App: React.FC = () => {
                     }
                 />
                 <Route path="/article/:articleId" element={<ArticleView />} />
+                <Route
+                    path="/articles"
+                    element={
+                        <ProtectedRoute>
+                            <ArticleList />
+                        </ProtectedRoute>
+                    }
+                />
                 <Route path="/" element={<Navigate to="/login" />} />
             </Routes>
         </>

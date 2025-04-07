@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Deny all reads and writes by default.
+    // You will need to add specific rules later to allow access.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

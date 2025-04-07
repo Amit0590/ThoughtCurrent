@@ -342,3 +342,84 @@ exports.updateArticle = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+exports.listArticles = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") return res.status(204).send("");
+  if (req.method !== "GET") {
+    return res.status(405).json({error: "Method Not Allowed"});
+  }
+
+  try {
+    console.log("listArticles (for authenticated user) function invoked.");
+
+    const authHeader = req.headers.authorization || "";
+    if (!/^Bearer\s+/i.test(authHeader)) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authorization header must be in format: Bearer <token>",
+      });
+    }
+
+    const idToken = authHeader.replace(/Bearer\s+/i, "").trim();
+    let decodedToken;
+    try {
+      decodedToken = await getAuth().verifyIdToken(idToken);
+      console.log("[listArticles] Token verified for UID:", decodedToken.uid);
+    } catch (error) {
+      console.error("[listArticles] Token verification error:", error);
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Invalid or expired authentication token",
+      });
+    }
+
+    const authorId = decodedToken.uid;
+    const articlesCollection = firestore.collection("articles");
+    const query = articlesCollection
+        .where("authorId", "==", authorId)
+        .orderBy("updatedAt", "desc")
+        .limit(25);
+
+    console.log(`[listArticles] Querying articles for authorId: ${authorId}`);
+    const snapshot = await query.get();
+
+    if (snapshot.empty) {
+      console.log(`No articles found for authorId: ${authorId}.`);
+      return res.status(200).json([]);
+    }
+
+    const articles = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      articles.push({
+        id: doc.id,
+        title: data.title,
+        status: data.status,
+        authorId: data.authorId,
+        authorName: data.authorName,
+        contentSnippet: (data.content || "").substring(0, 100) + "...",
+        createdAt: data.createdAt ?
+          data.createdAt.toDate().toISOString() :
+          null,
+        updatedAt: data.updatedAt ?
+          data.updatedAt.toDate().toISOString() :
+          null,
+      });
+    });
+
+    console.log(
+        `[listArticles] Returning ${articles.length} 
+      articles for user ${authorId}.`);
+    return res.status(200).json(articles);
+  } catch (error) {
+    console.error("Error listing user articles:", error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to retrieve articles",
+    });
+  }
+});

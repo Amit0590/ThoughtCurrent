@@ -31,6 +31,14 @@ const Navigation: React.FC = () => {
           <>
             <Button 
               component={Link} 
+              to="/articles" 
+              color="inherit"
+              sx={{ mr: 2 }}
+            >
+              My Articles
+            </Button>
+            <Button 
+              component={Link} 
               to="/content/create" 
               color="inherit"
               sx={{ mr: 2 }}

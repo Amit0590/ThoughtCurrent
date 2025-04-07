@@ -146,6 +146,14 @@ const App: React.FC = () => {
                         </ProtectedRoute>
                     }
                 />
+                <Route
+                    path="/article/:articleId/edit"
+                    element={
+                        <ProtectedRoute>
+                            <ContentEditor />
+                        </ProtectedRoute>
+                    }
+                />
                 <Route path="/article/:articleId" element={<ArticleView />} />
                 <Route path="/" element={<Navigate to="/login" />} />
             </Routes>

@@ -214,3 +214,109 @@ exports.getArticle = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+exports.updateArticle = functions.https.onRequest(async (req, res) => {
+  // Set CORS headers
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "PUT, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+
+  if (req.method !== "PUT") {
+    console.log(`Method ${req.method} not allowed for update.`);
+    res.set("Allow", "PUT");
+    return res.status(405).json({error: "Method Not Allowed"});
+  }
+
+  try {
+    // Get articleId from query parameter
+    const articleId = req.query.id;
+    if (!articleId || typeof articleId !== "string") {
+      return res.status(400).json({
+        error: "Invalid Request",
+        message: "Missing or invalid ID parameter",
+      });
+    }
+
+    // Verify auth token
+    const authHeader = req.headers.authorization || "";
+    if (!/^Bearer\s+/i.test(authHeader)) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Authorization header must be in format: Bearer <token>",
+      });
+    }
+
+    const idToken = authHeader.replace(/Bearer\s+/i, "").trim();
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const userId = decodedToken.uid;
+
+    // Get update data
+    const {title, content, categories, tags} = req.body;
+
+    // Validate fields
+    if (!title || typeof title !== "string" || title.trim() === "") {
+      return res.status(400).json({error: "Bad Request: Title is required"});
+    }
+    if (content === undefined || typeof content !== "string") {
+      return res.status(400).json(
+          {
+            error: "Bad Request: Content must be a string",
+          });
+    }
+
+    // Get article reference and check ownership
+    const articleRef = firestore.collection("articles").doc(articleId);
+    const docSnap = await articleRef.get();
+
+    if (!docSnap.exists) {
+      return res.status(404).json({error: "Not Found: Article not found."});
+    }
+
+    const existingData = docSnap.data();
+    if (existingData.authorId !== userId) {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "Not authorized to modify this article",
+      });
+    }
+
+    // Update document
+    const updateData = {
+      title: title.trim(),
+      content: content,
+      categories: Array.isArray(categories) ?
+        categories :
+        existingData.categories || [],
+      tags: Array.isArray(tags) ?
+        tags :
+        existingData.tags || [],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await articleRef.update(updateData);
+
+    return res.status(200).json({
+      success: true,
+      message: "Article updated successfully",
+      articleId: articleId,
+    });
+  } catch (error) {
+    console.error("Error processing update request:", error);
+
+    if (error.code === "auth/id-token-expired") {
+      return res.status(401).json({
+        error: "Token Expired",
+        message: "Your session has expired. Please sign in again.",
+      });
+    }
+
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: "Something went wrong while processing your request",
+    });
+  }
+});

@@ -19,9 +19,9 @@ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 root.render(
   <React.StrictMode>
     <Provider store={store}>
-      <ThemeProvider theme={theme}> {/* Wrap with MUI ThemeProvider */}
-        <CssBaseline /> {/* Apply baseline styles */}
-        <BrowserRouter> {/* Wrap App with BrowserRouter */}
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <BrowserRouter>
           <App />
         </BrowserRouter>
       </ThemeProvider>

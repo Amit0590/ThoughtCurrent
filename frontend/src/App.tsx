@@ -73,17 +73,18 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const processAuth = async () => {
-            console.log("Checking auth state...");
+            console.log("[App] Starting auth state monitoring...");
             
-            // Listen for auth state changes
-            const unsubscribe = auth.onAuthStateChanged((user) => {
-                console.log("Auth state changed:", user ? "logged in" : "logged out");
-                if (user) {
-                    dispatch(loginSuccess({
-                        uid: user.uid,
-                        email: user.email || "",
-                        displayName: user.displayName || undefined,
-                    }));
+            const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+                console.log("[App] Auth state changed:", firebaseUser ? "logged in" : "logged out");
+                if (firebaseUser) {
+                    // Create serializable user object
+                    const serializableUser = {
+                        id: firebaseUser.uid,
+                        email: firebaseUser.email || null,
+                        displayName: firebaseUser.displayName || null,
+                    };
+                    dispatch(loginSuccess(serializableUser));
                 }
                 setAuthChecked(true);
             });
@@ -91,25 +92,25 @@ const App: React.FC = () => {
             return () => unsubscribe();
         };
 
-        processAuth();
-
         const processRedirectResult = async () => {
             const redirectResult = await handleRedirectResult();
 
             if (redirectResult && redirectResult.user) {
-                const user = redirectResult.user;
-                dispatch(loginSuccess({
-                    uid: user.uid,
-                    email: user.email,
-                    displayName: user.displayName,
-                }));
-                // Only navigate on fresh Google sign-in
+                // Create serializable user object
+                const serializableUser = {
+                    id: redirectResult.user.uid,
+                    email: redirectResult.user.email || null,
+                    displayName: redirectResult.user.displayName || null,
+                };
+                dispatch(loginSuccess(serializableUser));
+                
                 if (redirectResult.credential) {
                     navigate('/dashboard');
                 }
             }
         };
 
+        processAuth();
         processRedirectResult();
     }, [dispatch, navigate]);
 

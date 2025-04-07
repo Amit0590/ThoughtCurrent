@@ -1,17 +1,12 @@
 // Import Firebase Authentication functions and the auth instance
-// import { createUser } from '../../firebase';
-import { UserCredential } from 'firebase/auth'; // Add missing import for getAuth
-
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-
 import {
     getAuth,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
-    updateProfile // <-- Add this import
+    updateProfile
 } from 'firebase/auth';
 
-// Import the Firebase app instance
 import app from '../../firebase';
 import { signInWithGoogle } from '../../firebase';
 
@@ -37,17 +32,19 @@ export const login = createAsyncThunk(
   'auth/login',
   async (credentials: { email: string; password: string }, thunkAPI) => {
     try {
-      // Use the `app` instance in `getAuth`
-      const auth = getAuth(app); // Use Firebase auth instance
-      const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password); // Use Firebase signInWithEmailAndPassword function
-      const user = { // Extract user data from Firebase UserCredential
+      const auth = getAuth(app);
+      const userCredential = await signInWithEmailAndPassword(
+        auth, credentials.email, credentials.password
+      );
+      
+      const serializableUser = {
         id: userCredential.user.uid,
         email: userCredential.user.email,
-        displayName: userCredential.user.displayName, // Or other relevant user info from Firebase
+        displayName: userCredential.user.displayName,
       };
-      return user; // Return user data for Redux state
+      return serializableUser;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.message); // Handle errors using thunkAPI.rejectWithValue
+      return thunkAPI.rejectWithValue(error.message);
     }
   }
 );
@@ -56,25 +53,23 @@ export const register = createAsyncThunk(
   'auth/register',
   async (userData: { firstName: string; lastName: string; email: string; password: string }, thunkAPI) => {
     try {
-      // Use the `app` instance in `getAuth`
-      const auth = getAuth(app); // Use Firebase auth instance
-      const userCredential: UserCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
+      const auth = getAuth(app);
+      const userCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
 
-      // --- START: Update Firebase profile ---
       await updateProfile(userCredential.user, {
         displayName: `${userData.firstName} ${userData.lastName}`
       });
-      // --- END: Update Firebase profile ---
 
-      const user = {
+      const updatedUser = getAuth(app).currentUser;
+
+      const serializableUser = {
         id: userCredential.user.uid,
-        email: userCredential.user.email,
-        // Read the displayName directly from the updated Firebase user object
-        displayName: userCredential.user.displayName,
+        email: updatedUser?.email || null,
+        displayName: updatedUser?.displayName || null,
       };
-      return user;
+      return serializableUser;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.message); // Handle errors with rejectWithValue
+      return thunkAPI.rejectWithValue(error.message);
     }
   }
 );
@@ -118,9 +113,9 @@ const authSlice = createSlice({
     loginSuccess(state, action) {
       state.isAuthenticated = true;
       state.user = {
-        id: action.payload.uid, // Extract only serializable fields
-        email: action.payload.email,
-        displayName: action.payload.displayName,
+        id: action.payload.id, // Changed from uid to id
+        email: action.payload.email || null,
+        displayName: action.payload.displayName || null,
       };
     },
   },

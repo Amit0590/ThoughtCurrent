@@ -19,10 +19,26 @@ const Navigation: React.FC = () => {
     <AppBar position="static">
       <Toolbar>
         <Box sx={{ flexGrow: 1 }}>
-          <Button component={Link} to="/" color="inherit">Thought Current</Button>
+          <Button 
+            component={Link} 
+            to={isAuthenticated ? "/dashboard" : "/"} 
+            color="inherit"
+          >
+            Thought Current
+          </Button>
         </Box>
         {isAuthenticated ? (
-          <Button color="inherit" onClick={handleLogout}>Logout</Button>
+          <>
+            <Button 
+              component={Link} 
+              to="/content/create" 
+              color="inherit"
+              sx={{ mr: 2 }}
+            >
+              New Article
+            </Button>
+            <Button color="inherit" onClick={handleLogout}>Logout</Button>
+          </>
         ) : (
           <>
             <Button component={Link} to="/login" color="inherit">Login</Button>

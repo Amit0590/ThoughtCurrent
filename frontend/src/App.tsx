@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react'; // Import useState
+import React, { useState, useEffect } from 'react'; // Import useState and useEffect
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import Navigation from './components/Navigation';
 import LoginForm from './components/auth/LoginForm';
 import RegistrationForm from './components/auth/RegistrationForm';
 import Dashboard from './components/Dashboard';
+import ContentEditor from './components/ContentEditor';
 import { RootState, AppDispatch } from './redux/store';
 import { handleRedirectResult, auth } from './firebase';
 import { loginSuccess } from './redux/slices/authSlice'; // Import loginSuccess
@@ -15,68 +16,80 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+    const [authChecked, setAuthChecked] = useState(false);
 
-    console.log("[ProtectedRoute] Rendering. isAuthenticated:", isAuthenticated); // <-- ADD THIS LOG
+    useEffect(() => {
+        const checkAuth = async () => {
+            const currentUser = auth.currentUser;
+            setAuthChecked(true);
+            if (!currentUser) {
+                console.log("[ProtectedRoute] No current user found");
+            }
+        };
+        checkAuth();
+    }, []);
 
-    if (!isAuthenticated) {
-        console.log("[ProtectedRoute] isAuthenticated is false. Redirecting to /login."); // <-- ADD THIS LOG
-        return <Navigate to="/login" />;
+    if (!authChecked) {
+        return <div>Checking authentication...</div>;
     }
 
-    console.log("[ProtectedRoute] isAuthenticated is true. Rendering children."); // <-- ADD THIS LOG
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
     return <>{children}</>;
 };
 
 const App: React.FC = () => {
+    const [authChecked, setAuthChecked] = useState(false);
     const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
 
     useEffect(() => {
-        const processRedirectResult = async () => {
-            console.log("[App.tsx - useEffect] Checking for redirect sign-in result...");
+        const processAuth = async () => {
+            console.log("Checking auth state...");
+            
+            // Listen for auth state changes
+            const unsubscribe = auth.onAuthStateChanged((user) => {
+                console.log("Auth state changed:", user ? "logged in" : "logged out");
+                if (user) {
+                    dispatch(loginSuccess({
+                        uid: user.uid,
+                        email: user.email || "",
+                        displayName: user.displayName || undefined,
+                    }));
+                }
+                setAuthChecked(true);
+            });
 
+            return () => unsubscribe();
+        };
+
+        processAuth();
+
+        const processRedirectResult = async () => {
             const redirectResult = await handleRedirectResult();
 
             if (redirectResult && redirectResult.user) {
                 const user = redirectResult.user;
-                console.log("[App.tsx - useEffect] Google Sign-in Redirect Success. User:", user);
-
                 dispatch(loginSuccess({
                     uid: user.uid,
                     email: user.email,
                     displayName: user.displayName,
                 }));
-                console.log("[App.tsx - useEffect] loginSuccess dispatched.");
-                setTimeout(() => {
-                    console.log("[App.tsx - useEffect] Navigating to dashboard...");
+                // Only navigate on fresh Google sign-in
+                if (redirectResult.credential) {
                     navigate('/dashboard');
-                }, 100);
-
-            } else if (redirectResult && redirectResult.error) {
-                console.error("[App.tsx - useEffect] Google Sign-in Redirect Error:", redirectResult.error);
-            } else {
-                console.log("[App.tsx - useEffect] No redirect result, checking for existing session...");
-                if (auth.currentUser) {
-                    const existingUser = auth.currentUser;
-                    console.log("[App.tsx - useEffect] Existing user session found:", existingUser);
-                    dispatch(loginSuccess({
-                        uid: existingUser.uid,
-                        email: existingUser.email,
-                        displayName: existingUser.displayName,
-                    }));
-                    console.log("[App.tsx - useEffect] loginSuccess (existing session) dispatched.");
-                    setTimeout(() => {
-                        console.log("[App.tsx - useEffect] Navigating to dashboard (existing session)...");
-                        navigate('/dashboard');
-                    }, 100);
-                } else {
-                    console.log("[App.tsx - useEffect] No existing session found.");
                 }
             }
         };
 
         processRedirectResult();
-    }, [dispatch, navigate]); // Keep navigate in dependency array
+    }, [dispatch, navigate]);
+
+    if (!authChecked) {
+        return <div>Loading...</div>;
+    }
 
     return (
         <>
@@ -89,6 +102,14 @@ const App: React.FC = () => {
                     element={
                         <ProtectedRoute>
                             <Dashboard />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/content/create"
+                    element={
+                        <ProtectedRoute>
+                            <ContentEditor />
                         </ProtectedRoute>
                     }
                 />

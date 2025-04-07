@@ -17,14 +17,21 @@ const firebaseConfig = {
 
 // Error check for missing or incomplete Firebase configuration
 if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-    throw new Error("Firebase configuration is missing or incomplete. Check your Firebase project settings and src/firebase.js");
+  throw new Error("Firebase configuration is missing or incomplete. Check your Firebase project settings and src/firebase.js");
 }
 
-// Initialize Firebase app
+// Initialize Firebase app with verified config
 const app = initializeApp(firebaseConfig);
 
 // Export auth instance for use in app
-export const auth = getAuth(app); // Export auth instance
+export const auth = getAuth(app);
+
+// --- TEMPORARY DEBUGGING LINE - REMOVE LATER ---
+if (typeof window !== 'undefined') { // Check if running in browser
+    window.firebaseAuth = auth; // Expose auth globally
+    console.log("Firebase auth instance exposed to window.firebaseAuth for debugging.");
+}
+// --- END TEMPORARY DEBUGGING LINE ---
 
 // Attempt to set persistence explicitly
 setPersistence(auth, browserLocalPersistence)

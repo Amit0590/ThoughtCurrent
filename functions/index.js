@@ -47,6 +47,12 @@ exports.createArticle = functions.https.onRequest(async (req, res) => {
     const idToken = authHeader.replace(/Bearer\s+/i, "").trim();
     const decodedToken = await getAuth().verifyIdToken(idToken);
 
+    // Split long log statement
+    console.log("[createArticle] Decoded token:", {
+      uid: decodedToken.uid,
+      name: decodedToken.name,
+    });
+
     // Validate required fields
     if (!req.body.title || typeof req.body.title !== "string") {
       return res.status(400).json({
@@ -55,11 +61,11 @@ exports.createArticle = functions.https.onRequest(async (req, res) => {
       });
     }
 
-    // Prepare article data
+    // Prepare article data with correct authorId
     const articleData = {
       title: req.body.title.trim(),
       content: req.body.content || "",
-      authorId: decodedToken.uid,
+      authorId: decodedToken.uid, // Ensure authorId is set from token
       authorName: decodedToken.name || "Anonymous Author",
       status: "draft",
       categories: Array.isArray(req.body.categories) ? req.body.categories : [],
@@ -67,6 +73,8 @@ exports.createArticle = functions.https.onRequest(async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
+
+    console.log("[createArticle] Data to save in Firestore:", articleData);
 
     // Create document in Firestore
     const docRef = await firestore.collection("articles").add(articleData);
@@ -144,6 +152,16 @@ exports.getArticle = functions.https.onRequest(async (req, res) => {
     }
 
     const articleData = articleDoc.data();
+    // Split long log into multiple lines
+    console.log("[getArticle] Raw articleData fetched from Firestore:",
+        JSON.stringify(articleData, null, 2),
+    );
+    console.log(
+        `[getArticle] Article found: ${articleId}, 
+        Status: ${articleData.status}`,
+    );
+    console.log(`[getArticle] AuthorId from Firestore:`, articleData.authorId);
+
     const articleStatus = articleData.status || "draft";
 
     // Handle draft access
@@ -183,22 +201,26 @@ exports.getArticle = functions.https.onRequest(async (req, res) => {
       });
     }
 
-    // Prepare safe response data
+    // Prepare safe response data with explicit authorId
     const responseData = {
       id: articleDoc.id,
       title: articleData.title,
       content: articleData.content,
       status: articleStatus,
+      authorId: articleData.authorId, // Explicitly include authorId
+      authorName: articleData.authorName,
       createdAt: articleData.createdAt ?
         articleData.createdAt.toDate().toISOString() :
         null,
       updatedAt: articleData.updatedAt ?
         articleData.updatedAt.toDate().toISOString() :
         null,
-      authorName: articleData.authorName,
       tags: articleData.tags || [],
       categories: articleData.categories || [],
     };
+
+    console.log(`[getArticle] Preparing to send responseData:`,
+        JSON.stringify(responseData, null, 2));
 
     // Add cache control for published articles
     if (articleStatus === "published") {

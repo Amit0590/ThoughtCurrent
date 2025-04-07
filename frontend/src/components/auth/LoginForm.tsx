@@ -4,14 +4,15 @@ import {
     Button,
     Grid,
     Typography,
-    Paper, // Import Paper
+    Paper,
     CircularProgress,
     Snackbar,
-    Divider
+    Divider,
+    Box  // Add Box import
 } from '@mui/material';
 import { useForm, SubmitHandler } from 'react-hook-form'; // Import useForm
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom'; // Import Link
 // Import `loginSuccess` from `authSlice.ts`
 import { login, googleLogin } from '../../redux/slices/authSlice';
 import { RootState, AppDispatch } from '../../redux/store';
@@ -137,6 +138,16 @@ const LoginForm: React.FC = () => {
             </Button>
           </Grid>
         </Grid>
+        <Box sx={{ textAlign: 'right', mt: 1 }}>
+          <Button 
+            component={Link} 
+            to="/forgot-password" 
+            size="small"
+            color="primary"
+          >
+            Forgot Password?
+          </Button>
+        </Box>
       </Paper>
       {/* Snackbar for displaying Redux errors */}
       <Snackbar

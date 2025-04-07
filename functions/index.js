@@ -423,3 +423,50 @@ exports.listArticles = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+exports.sendPasswordResetEmail = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+
+  if (req.method !== "POST") {
+    res.set("Allow", "POST");
+    return res.status(405).json({error: "Method Not Allowed"});
+  }
+
+  try {
+    const {email} = req.body;
+
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({error: "Bad Request: Email is required."});
+    }
+
+    console.log(
+        `[sendPasswordResetEmail] 
+      Request received for email: ${email}`);
+
+    const link = await getAuth().generatePasswordResetLink(email);
+
+    console.log(
+        `[sendPasswordResetEmail] 
+        Password reset link (for testing): ${link}`);
+    console.log(
+        `[sendPasswordResetEmail] 
+        In production, SEND THIS LINK VIA EMAIL to ${email}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset process initiated.",
+    });
+  } catch (error) {
+    console.error("[sendPasswordResetEmail] Error:", error);
+    res.status(200).json({
+      success: true,
+      message: "Password reset process initiated (even on internal error).",
+    });
+  }
+});

@@ -4,6 +4,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import Navigation from './components/Navigation';
 import LoginForm from './components/auth/LoginForm';
 import RegistrationForm from './components/auth/RegistrationForm';
+import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
+import ResetPasswordForm from './components/auth/ResetPasswordForm';
 import Dashboard from './components/Dashboard';
 import ContentEditor from './components/ContentEditor';
 import ArticleView from './components/ArticleView';
@@ -132,6 +134,8 @@ const App: React.FC = () => {
                         <RegistrationForm />
                     </RedirectIfAuthenticated>
                 } />
+                <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+                <Route path="/reset-password" element={<ResetPasswordForm />} />
                 <Route
                     path="/dashboard"
                     element={

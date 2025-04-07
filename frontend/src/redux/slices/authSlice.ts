@@ -4,7 +4,8 @@ import {
     getAuth,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
-    updateProfile
+    updateProfile,
+    sendEmailVerification
 } from 'firebase/auth';
 
 import app from '../../firebase';
@@ -59,6 +60,14 @@ export const register = createAsyncThunk(
       await updateProfile(userCredential.user, {
         displayName: `${userData.firstName} ${userData.lastName}`
       });
+
+      // Send verification email
+      try {
+        await sendEmailVerification(userCredential.user);
+        console.log("[register thunk] Verification email sent.");
+      } catch (verificationError) {
+        console.error("[register thunk] Failed to send verification email:", verificationError);
+      }
 
       const updatedUser = getAuth(app).currentUser;
 

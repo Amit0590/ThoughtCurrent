@@ -101,3 +101,116 @@ exports.createArticle = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+exports.getArticle = functions.https.onRequest(async (req, res) => {
+  // Set CORS headers
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // Handle preflight request
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+
+  // Validate request method
+  if (req.method !== "GET") {
+    return res.status(405).json({
+      error: "Method Not Allowed",
+      message: "Only GET requests are accepted",
+    });
+  }
+
+  try {
+    // Validate article ID parameter
+    const articleId = req.query.id;
+    if (!articleId || typeof articleId !== "string" || articleId.length === 0) {
+      return res.status(400).json({
+        error: "Invalid Request",
+        message: "Missing or invalid article ID parameter",
+      });
+    }
+
+    // Get article document
+    const articleRef = firestore.collection("articles").doc(articleId);
+    const articleDoc = await articleRef.get();
+
+    // Check document existence
+    if (!articleDoc.exists) {
+      return res.status(404).json({
+        error: "Not Found",
+        message: "Article not found",
+      });
+    }
+
+    const articleData = articleDoc.data();
+    const articleStatus = articleData.status || "draft";
+
+    // Handle draft access
+    if (articleStatus === "draft") {
+      // Authentication check
+      const authHeader = req.headers.authorization || "";
+      if (!/^Bearer\s+/i.test(authHeader)) {
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "Authentication required for draft access",
+        });
+      }
+
+      // Verify token
+      const idToken = authHeader.replace(/Bearer\s+/i, "").trim();
+      try {
+        const decodedToken = await getAuth().verifyIdToken(idToken);
+
+        // Authorization check
+        if (decodedToken.uid !== articleData.authorId) {
+          return res.status(403).json({
+            error: "Forbidden",
+            message: "You don't have permission to view this draft",
+          });
+        }
+      } catch (error) {
+        console.error("Token verification error:", error);
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "Invalid or expired authentication token",
+        });
+      }
+    } else if (articleStatus !== "published") {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "This article is not publicly available",
+      });
+    }
+
+    // Prepare safe response data
+    const responseData = {
+      id: articleDoc.id,
+      title: articleData.title,
+      content: articleData.content,
+      status: articleStatus,
+      createdAt: articleData.createdAt ?
+        articleData.createdAt.toDate().toISOString() :
+        null,
+      updatedAt: articleData.updatedAt ?
+        articleData.updatedAt.toDate().toISOString() :
+        null,
+      authorName: articleData.authorName,
+      tags: articleData.tags || [],
+      categories: articleData.categories || [],
+    };
+
+    // Add cache control for published articles
+    if (articleStatus === "published") {
+      res.set("Cache-Control", "public, max-age=300, s-maxage=600");
+    }
+
+    return res.status(200).json(responseData);
+  } catch (error) {
+    console.error("Server Error:", error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: "Something went wrong while processing your request",
+    });
+  }
+});

@@ -6,6 +6,7 @@ import LoginForm from './components/auth/LoginForm';
 import RegistrationForm from './components/auth/RegistrationForm';
 import Dashboard from './components/Dashboard';
 import ContentEditor from './components/ContentEditor';
+import ArticleView from './components/ArticleView';
 import { RootState, AppDispatch } from './redux/store';
 import { handleRedirectResult, auth } from './firebase';
 import { loginSuccess } from './redux/slices/authSlice'; // Import loginSuccess
@@ -35,6 +36,30 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
+    }
+
+    return <>{children}</>;
+};
+
+const RedirectIfAuthenticated: React.FC<ProtectedRouteProps> = ({ children }) => {
+    const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+    const [authChecked, setAuthChecked] = useState(false);
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            await auth.onAuthStateChanged(() => {
+                setAuthChecked(true);
+            });
+        };
+        checkAuth();
+    }, []);
+
+    if (!authChecked) {
+        return <div>Checking authentication...</div>;
+    }
+
+    if (isAuthenticated) {
+        return <Navigate to="/dashboard" replace />;
     }
 
     return <>{children}</>;
@@ -95,8 +120,16 @@ const App: React.FC = () => {
         <>
             <Navigation />
             <Routes>
-                <Route path="/login" element={<LoginForm />} />
-                <Route path="/register" element={<RegistrationForm />} />
+                <Route path="/login" element={
+                    <RedirectIfAuthenticated>
+                        <LoginForm />
+                    </RedirectIfAuthenticated>
+                } />
+                <Route path="/register" element={
+                    <RedirectIfAuthenticated>
+                        <RegistrationForm />
+                    </RedirectIfAuthenticated>
+                } />
                 <Route
                     path="/dashboard"
                     element={
@@ -113,6 +146,7 @@ const App: React.FC = () => {
                         </ProtectedRoute>
                     }
                 />
+                <Route path="/article/:articleId" element={<ArticleView />} />
                 <Route path="/" element={<Navigate to="/login" />} />
             </Routes>
         </>

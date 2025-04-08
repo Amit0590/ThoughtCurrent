@@ -81,6 +81,7 @@ const LoginForm: React.FC = () => {
               <TextField
                 label="Email Address"
                 fullWidth
+                autoComplete="email"
                 // Use register from react-hook-form
                 {...register("email", {
                     required: "Email is required",
@@ -100,6 +101,7 @@ const LoginForm: React.FC = () => {
                 label="Password"
                 type="password"
                 fullWidth
+                autoComplete="current-password"
                 // Use register from react-hook-form
                 {...register("password", { required: "Password is required" })}
                 // Connect error state from react-hook-form

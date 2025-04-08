@@ -101,6 +101,7 @@ const ResetPasswordForm: React.FC = () => {
                   label="New Password"
                   type="password"
                   fullWidth
+                  autoComplete="new-password"
                   {...register("newPassword", {
                     required: "New password is required",
                     minLength: { value: 6, message: "Password must be at least 6 characters" }
@@ -115,6 +116,7 @@ const ResetPasswordForm: React.FC = () => {
                   label="Confirm New Password"
                   type="password"
                   fullWidth
+                  autoComplete="new-password"
                   {...register("confirmPassword", {
                     required: "Please confirm your new password",
                     validate: value => value === newPassword || "Passwords do not match"

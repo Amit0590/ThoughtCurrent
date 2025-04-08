@@ -2,10 +2,62 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Deny all reads and writes by default.
-    // You will need to add specific rules later to allow access.
-    match /{document=**} {
-      allow read, write: if false;
+    // Helper functions for common checks
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAuthor(rsc) {
+      return isSignedIn() && rsc.data.authorId == request.auth.uid;
+    }
+
+    function hasValidFields(rsc) {
+      return rsc.data.title is string && 
+             rsc.data.content is string &&
+             rsc.data.authorName is string &&
+             rsc.data.authorId is string;
+    }
+
+    function hasValidStatus(rsc) {
+      let status = rsc.data.status;
+      return status in ['draft', 'published'];
+    }
+
+    match /articles/{articleId} {
+      // READ: Anyone can read published articles, author can read their own
+      allow read: if resource.data.status == 'published' ||
+                    isAuthor(resource);
+
+      // CREATE: Authenticated users can create drafts with correct author info
+      allow create: if isSignedIn() &&
+                     request.resource.data.authorId == request.auth.uid &&
+                     request.resource.data.status == 'draft' &&
+                     hasValidFields(request.resource) &&
+                     hasValidStatus(request.resource) &&
+                     request.resource.data.createdAt == request.time &&
+                     request.resource.data.updatedAt == request.time;
+
+      // UPDATE: Authors can update their articles with restrictions
+      allow update: if isAuthor(resource) &&
+                     hasValidFields(request.resource) &&
+                     hasValidStatus(request.resource) &&
+                     // Prevent changing critical fields
+                     request.resource.data.authorId == resource.data.authorId &&
+                     request.resource.data.createdAt == resource.data.createdAt &&
+                     // Enforce update timestamp
+                     request.resource.data.updatedAt == request.time &&
+                     // Status transition rules
+                     (
+                       // Can keep as draft
+                       (resource.data.status == 'draft' && request.resource.data.status == 'draft') ||
+                       // Can publish draft
+                       (resource.data.status == 'draft' && request.resource.data.status == 'published') ||
+                       // Can update published
+                       (resource.data.status == 'published' && request.resource.data.status == 'published')
+                     );
+
+      // DELETE: Only authors can delete their articles
+      allow delete: if isAuthor(resource);
     }
   }
 }

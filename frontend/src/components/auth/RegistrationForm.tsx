@@ -89,6 +89,7 @@ const RegistrationForm: React.FC = () => {
               <TextField
                 label="First Name"
                 fullWidth
+                autoComplete="given-name"
                 // Use register from react-hook-form
                 {...registerField("firstName", { required: "First name is required" })}
                 // Connect error state from react-hook-form
@@ -101,6 +102,7 @@ const RegistrationForm: React.FC = () => {
               <TextField
                 label="Last Name"
                 fullWidth
+                autoComplete="family-name"
                 // Use register from react-hook-form
                 {...registerField("lastName", { required: "Last name is required" })}
                 // Connect error state from react-hook-form
@@ -113,6 +115,7 @@ const RegistrationForm: React.FC = () => {
               <TextField
                 label="Email Address"
                 fullWidth
+                autoComplete="email"
                 // Use register from react-hook-form
                 {...registerField("email", {
                     required: "Email is required",
@@ -132,6 +135,7 @@ const RegistrationForm: React.FC = () => {
                 label="Password"
                 type="password"
                 fullWidth
+                autoComplete="new-password"
                 // Use register from react-hook-form
                 {...registerField("password", { required: "Password is required" })}
                 // Connect error state from react-hook-form
@@ -145,6 +149,7 @@ const RegistrationForm: React.FC = () => {
                 label="Confirm Password"
                 type="password"
                 fullWidth
+                autoComplete="new-password"
                 // Use register from react-hook-form
                 {...registerField("confirmPassword", { required: "Please confirm your password" })}
                 // Connect error state from react-hook-form

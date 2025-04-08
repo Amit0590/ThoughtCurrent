@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Container, Paper, Typography, CircularProgress, Alert, Box, Button } from '@mui/material';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Container, Paper, Typography, CircularProgress, Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { auth } from '../firebase';
@@ -45,6 +45,55 @@ const ArticleView: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const currentUser = useSelector((state: RootState) => state.auth.user);  // Fix: access user through auth slice
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const handleClickOpenDeleteDialog = () => {
+    setDeleteDialogOpen(true);
+    setDeleteError(null);
+  };
+
+  const handleCloseDeleteDialog = () => setDeleteDialogOpen(false);
+
+  const handleDeleteConfirm = async () => {
+    if (!article || !currentUser || currentUser.id !== article.authorId) {
+      console.error("Delete authorization failed or article missing.");
+      setDeleteError("Authorization failed.");
+      return;
+    }
+
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    try {
+      const token = await auth.currentUser?.getIdToken(true);
+      if (!token) throw new Error("Authentication token not found.");
+
+      const functionUrl = `https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/deleteArticle?id=${article.id}`;
+
+      const response = await fetch(functionUrl, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok && responseData.success) {
+        console.log(`Article ${article.id} deleted successfully.`);
+        handleCloseDeleteDialog();
+        navigate('/articles');
+      } else {
+        throw new Error(responseData.error || `Failed to delete article (Status: ${response.status})`);
+      }
+    } catch (error: any) {
+      console.error("Error deleting article:", error);
+      setDeleteError(`Deletion failed: ${error.message}`);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchArticle = async () => {
@@ -150,7 +199,7 @@ const ArticleView: React.FC = () => {
     <Container maxWidth="md">
       <Paper elevation={1} sx={{ p: { xs: 2, md: 4 }, mt: 4, mb: 4 }}>
         {isAuthor && (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 1 }}>
             <Button
               component={Link}
               to={`/article/${article?.id}/edit`}
@@ -158,6 +207,15 @@ const ArticleView: React.FC = () => {
               size="small"
             >
               Edit Article
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              size="small"
+              onClick={handleClickOpenDeleteDialog}
+              disabled={deleteLoading}
+            >
+              Delete
             </Button>
           </Box>
         )}
@@ -235,6 +293,36 @@ const ArticleView: React.FC = () => {
           </Box>
         )}
       </Paper>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDeleteDialog}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">
+          {"Confirm Deletion"}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Are you sure you want to permanently delete this article? This action cannot be undone.
+          </DialogContentText>
+          {deleteError && <Alert severity="error" sx={{ mt: 2 }}>{deleteError}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} disabled={deleteLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            autoFocus
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? <CircularProgress size={20} /> : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

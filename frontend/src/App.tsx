@@ -10,6 +10,7 @@ import Dashboard from './components/Dashboard';
 import ContentEditor from './components/ContentEditor';
 import ArticleView from './components/ArticleView';
 import ArticleList from './components/ArticleList';
+import ActionHandler from './components/auth/ActionHandler';
 import { RootState, AppDispatch } from './redux/store';
 import { handleRedirectResult, auth } from './firebase';
 import { loginSuccess } from './redux/slices/authSlice'; // Import loginSuccess
@@ -85,6 +86,7 @@ const App: React.FC = () => {
                         id: firebaseUser.uid,
                         email: firebaseUser.email || null,
                         displayName: firebaseUser.displayName || null,
+                        emailVerified: firebaseUser.emailVerified,
                     };
                     dispatch(loginSuccess(serializableUser));
                 }
@@ -98,11 +100,13 @@ const App: React.FC = () => {
             const redirectResult = await handleRedirectResult();
 
             if (redirectResult && redirectResult.user) {
+                const user = redirectResult.user;
                 // Create serializable user object
                 const serializableUser = {
-                    id: redirectResult.user.uid,
-                    email: redirectResult.user.email || null,
-                    displayName: redirectResult.user.displayName || null,
+                    id: user.uid,
+                    email: user.email || null,
+                    displayName: user.displayName || null,
+                    emailVerified: user.emailVerified,
                 };
                 dispatch(loginSuccess(serializableUser));
                 
@@ -169,6 +173,7 @@ const App: React.FC = () => {
                         </ProtectedRoute>
                     }
                 />
+                <Route path="/auth/action" element={<ActionHandler />} />
                 <Route path="/" element={<Navigate to="/login" />} />
             </Routes>
         </>

@@ -470,3 +470,106 @@ exports.sendPasswordResetEmail = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+exports.deleteArticle = functions.https.onRequest(async (req, res) => {
+  // Set CORS headers
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "DELETE, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") return res.status(204).send("");
+
+  if (req.method !== "DELETE") {
+    console.log(`Method ${req.method} not allowed for delete.`);
+    res.set("Allow", "DELETE");
+    return res.status(405).json({error: "Method Not Allowed"});
+  }
+
+  try {
+    console.log("deleteArticle (2nd gen) function invoked.");
+
+    const articleId = req.query.id;
+    if (!articleId || typeof articleId !== "string") {
+      console.log("Missing or invalid 'id' query parameter for delete.");
+      return res.status(400).json({
+        error: "Bad Request: Missing or invalid article 'id' parameter.",
+      });
+    }
+    console.log(`Attempting to delete article with ID: ${articleId}`);
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.log("Authorization header missing or invalid for delete.");
+      return res.status(401).json({
+        error: "Unauthorized: Missing or invalid Authorization header",
+      });
+    }
+    const idToken = authHeader.split("Bearer ")[1];
+
+    let decodedToken;
+    try {
+      decodedToken = await getAuth().verifyIdToken(idToken);
+      console.log("ID Token verified for delete, UID:", decodedToken.uid);
+    } catch (error) {
+      console.error("Error verifying ID token for delete:", error);
+      return res.status(401).json({
+        error: "Unauthorized: Invalid ID token",
+      });
+    }
+    const userId = decodedToken.uid;
+
+    const articleRef = firestore.collection("articles").doc(articleId);
+    console.log(`Accessing Firestore doc for delete: articles/${articleId}`);
+
+    try {
+      const docSnap = await articleRef.get();
+      if (!docSnap.exists) {
+        console.log(`Article ${articleId} not found for delete.`);
+        return res.status(200).json({
+          success: true,
+          message: "Article already deleted or not found.",
+        });
+      }
+
+      const existingData = docSnap.data();
+      if (existingData.authorId !== userId) {
+        console.log(
+            `Forbidden delete: 
+            User ${userId} is not author ${existingData.authorId}`,
+        );
+        return res.status(403).json({
+          error:
+          "Forbidden: You do not have permission to delete this article.",
+        });
+      }
+      console.log(
+          `User ${userId} authorized to delete article ${articleId}.`);
+    } catch (dbError) {
+      console.error(
+          "Firestore error fetching article for delete check:", dbError);
+      return res.status(500).json({
+        error: "Internal Server Error: Could not verify article ownership.",
+      });
+    }
+
+    try {
+      await articleRef.delete();
+      console.log(`Article ${articleId} successfully deleted from Firestore.`);
+    } catch (dbError) {
+      console.error("Firestore error deleting article:", dbError);
+      return res.status(500).json({
+        error: "Internal Server Error: Could not delete article.",
+      });
+    }
+
+    console.log("Sending delete success response...");
+    res.status(200).json({
+      success: true,
+      message: "Article deleted successfully",
+      articleId: articleId,
+    });
+  } catch (error) {
+    console.error("Cloud Function uncaught error:", error);
+    return res.status(500).json({error: "Internal Server Error"});
+  }
+});

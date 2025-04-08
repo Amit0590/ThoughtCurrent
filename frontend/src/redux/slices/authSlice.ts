@@ -1,5 +1,5 @@
 // Import Firebase Authentication functions and the auth instance
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import {
     getAuth,
     createUserWithEmailAndPassword,
@@ -15,8 +15,9 @@ interface AuthState {
   isAuthenticated: boolean;
   user: {
     id: string;
-    email: string;
-    displayName?: string;
+    email: string | null;
+    displayName?: string | null;
+    emailVerified: boolean;
   } | null;
   loading: boolean; // Add loading state
   error: string | null; // Add error state
@@ -42,6 +43,7 @@ export const login = createAsyncThunk(
         id: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: userCredential.user.displayName,
+        emailVerified: userCredential.user.emailVerified,
       };
       return serializableUser;
     } catch (error: any) {
@@ -75,6 +77,7 @@ export const register = createAsyncThunk(
         id: userCredential.user.uid,
         email: updatedUser?.email || null,
         displayName: updatedUser?.displayName || null,
+        emailVerified: updatedUser?.emailVerified || false,
       };
       return serializableUser;
     } catch (error: any) {
@@ -102,6 +105,7 @@ export const googleLogin = createAsyncThunk(
           id: result.user.uid,
           email: result.user.email,
           displayName: result.user.displayName,
+          emailVerified: result.user.emailVerified,
         };
       }
       throw new Error('Google sign-in failed');
@@ -119,13 +123,14 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.user = null;
     },
-    loginSuccess(state, action) {
+    loginSuccess(state, action: PayloadAction<{ 
+      id: string; 
+      email: string | null; 
+      displayName?: string | null; 
+      emailVerified: boolean 
+    }>) {
       state.isAuthenticated = true;
-      state.user = {
-        id: action.payload.id, // Changed from uid to id
-        email: action.payload.email || null,
-        displayName: action.payload.displayName || null,
-      };
+      state.user = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -137,11 +142,7 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false;
         state.isAuthenticated = true;
-        state.user = {
-          id: action.payload.id,
-          email: action.payload.email || '', // Ensure email is always a string
-          displayName: action.payload.displayName ?? undefined,
-        };
+        state.user = action.payload;
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -154,11 +155,7 @@ const authSlice = createSlice({
       .addCase(register.fulfilled, (state, action) => {
         state.loading = false;
         state.isAuthenticated = true;
-        state.user = {
-          id: action.payload.id,
-          email: action.payload.email || '', // Ensure email is always a string
-          displayName: action.payload.displayName ?? undefined,
-        };
+        state.user = action.payload;
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
@@ -175,11 +172,7 @@ const authSlice = createSlice({
       .addCase(googleLogin.fulfilled, (state, action) => {
         state.loading = false;
         state.isAuthenticated = true;
-        state.user = {
-          id: action.payload.id,
-          email: action.payload.email || '',
-          displayName: action.payload.displayName ?? undefined,
-        };
+        state.user = action.payload;
       })
       .addCase(googleLogin.rejected, (state, action) => {
         state.loading = false;

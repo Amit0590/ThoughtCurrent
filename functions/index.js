@@ -573,3 +573,62 @@ exports.deleteArticle = functions.https.onRequest(async (req, res) => {
     return res.status(500).json({error: "Internal Server Error"});
   }
 });
+
+exports.listPublicArticles = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+
+  if (req.method !== "GET") {
+    res.set("Allow", "GET");
+    return res.status(405).json({error: "Method Not Allowed"});
+  }
+
+  try {
+    console.log("listPublicArticles function invoked.");
+
+    const articlesCollection = firestore.collection("articles");
+    const query = articlesCollection
+        .where("status", "==", "published")
+        .orderBy("createdAt", "desc")
+        .limit(20);
+
+    console.log("[listPublicArticles] Querying published articles...");
+    const snapshot = await query.get();
+
+    if (snapshot.empty) {
+      console.log("No published articles found.");
+      return res.status(200).json([]);
+    }
+
+    const articles = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      articles.push({
+        id: doc.id,
+        title: data.title,
+        authorName: data.authorName,
+        contentSnippet: (data.content || "").substring(0, 200) + "...",
+        createdAt: data.createdAt && data.createdAt.toDate ?
+          data.createdAt.toDate().toISOString() :
+          data.createdAt,
+        updatedAt: data.updatedAt && data.updatedAt.toDate ?
+          data.updatedAt.toDate().toISOString() :
+          data.updatedAt,
+      });
+    });
+
+    console.log(`[listPublicArticles] Returning ${articles.length} articles.`);
+    return res.status(200).json(articles);
+  } catch (error) {
+    console.error("Error listing public articles:", error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to retrieve published articles",
+    });
+  }
+});

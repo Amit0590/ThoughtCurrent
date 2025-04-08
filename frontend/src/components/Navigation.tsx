@@ -26,6 +26,13 @@ const Navigation: React.FC = () => {
           >
             Thought Current
           </Button>
+          <Button 
+            component={Link} 
+            to="/essays" 
+            color="inherit"
+          >
+            Essays
+          </Button>
         </Box>
         {isAuthenticated ? (
           <>

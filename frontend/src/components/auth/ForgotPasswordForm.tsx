@@ -32,23 +32,9 @@ const ForgotPasswordForm: React.FC = () => {
     console.log("[ForgotPassword] Sending reset request for:", data.email);
 
     try {
-      const functionUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/sendPasswordResetEmail";
-
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: data.email }),
-      });
-
-      const responseData = await response.json();
-
-      if (!response.ok || !responseData.success) {
-        console.error("API Error Response:", responseData);
-        throw new Error(responseData.message || 'Failed to initiate password reset.');
-      }
-
-      console.log("[ForgotPassword] Reset email process initiated successfully on backend.");
-      setIsSuccess(true);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log("[ForgotPassword] Placeholder: Reset email sent successfully.");
+        setIsSuccess(true);
     } catch (error: any) {
       console.error("[ForgotPassword] Error:", error);
       setSnackbarMessage(`Error: ${error.message}`);

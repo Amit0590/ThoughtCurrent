@@ -11,6 +11,7 @@ import ContentEditor from './components/ContentEditor';
 import ArticleView from './components/ArticleView';
 import ArticleList from './components/ArticleList';
 import ActionHandler from './components/auth/ActionHandler';
+import PublicArticleList from './components/PublicArticleList';
 import { RootState, AppDispatch } from './redux/store';
 import { handleRedirectResult, auth } from './firebase';
 import { loginSuccess } from './redux/slices/authSlice'; // Import loginSuccess
@@ -174,6 +175,7 @@ const App: React.FC = () => {
                     }
                 />
                 <Route path="/auth/action" element={<ActionHandler />} />
+                <Route path="/essays" element={<PublicArticleList />} />
                 <Route path="/" element={<Navigate to="/login" />} />
             </Routes>
         </>

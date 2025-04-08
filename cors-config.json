@@ -5,12 +5,18 @@
       "https://psychic-fold-455618-b9.firebaseapp.com",
       "https://psychic-fold-455618-b9.web.app"
     ],
-    "method": ["PUT", "POST", "GET", "HEAD", "OPTIONS"],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
     "responseHeader": [
       "Content-Type",
-      "Authorization",
       "Content-Length",
-      "User-Agent",
+      "Authorization",
+      "Accept",
+      "Origin",
+      "X-Requested-With",
+      "X-Goog-Resumable",
+      "ETag",
+      "Cache-Control",
+      "Content-Disposition",
       "x-goog-*"
     ],
     "maxAgeSeconds": 3600

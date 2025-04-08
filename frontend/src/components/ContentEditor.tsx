@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Container,
   Paper,
@@ -27,9 +27,9 @@ const quillModules = {
     [{ 'header': [1, 2, 3, false] }],
     ['bold', 'italic', 'underline', 'strike', 'blockquote'],
     [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
-    ['link'],
+    ['link', 'image'],
     ['clean']
-  ],
+  ]
 } as const;
 
 const ContentEditor: React.FC = () => {
@@ -47,6 +47,7 @@ const ContentEditor: React.FC = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [initialDataLoading, setInitialDataLoading] = useState<boolean>(isEditing);
   const user = useSelector((state: RootState) => state.auth.user);
+  const quillRef = useRef<ReactQuill>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -188,6 +189,107 @@ const ContentEditor: React.FC = () => {
 
   const handleCloseSnackbar = () => setShowSnackbar(false);
 
+  const uploadImageToGCS = useCallback(async (file: File) => {
+    if (!auth.currentUser) {
+      setSnackbarMessage('Error: Must be logged in to upload images.');
+      setShowSnackbar(true);
+      return;
+    }
+
+    setLoading(true);
+    setSnackbarMessage('Uploading image...');
+    setShowSnackbar(true);
+
+    try {
+      const token = await auth.currentUser.getIdToken(true);
+      if (!token) throw new Error('Could not get auth token.');
+
+      const signedUrlFunctionUrl = 
+        'https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/generateSignedUploadUrl';
+      
+      const getUrlResponse = await fetch(signedUrlFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type,
+        }),
+      });
+
+      if (!getUrlResponse.ok) {
+        const errorData = await getUrlResponse.json();
+        throw new Error(errorData.error || 'Failed to get upload URL.');
+      }
+
+      const { signedUrl, publicUrl } = await getUrlResponse.json();
+
+      const uploadResponse = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type,
+        },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+      }
+
+      const quill = quillRef.current?.getEditor();
+      if (quill) {
+        const range = quill.getSelection(true);
+        quill.insertEmbed(range.index, 'image', publicUrl);
+        quill.setSelection(range.index + 1, 0);
+      }
+
+      setSnackbarMessage('Image uploaded successfully!');
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      setSnackbarMessage(`Upload failed: ${error.message}`);
+    } finally {
+      setLoading(false);
+      setShowSnackbar(true);
+      setTimeout(() => setShowSnackbar(false), 4000);
+    }
+  }, [setSnackbarMessage, setShowSnackbar, setLoading]);
+
+  const imageHandler = useCallback(() => {
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
+
+    input.onchange = async () => {
+      const files = input.files;
+      if (files && files.length > 0) {
+        const file = files[0];
+        console.log('Selected file:', file);
+        await uploadImageToGCS(file);
+      }
+    };
+  }, [uploadImageToGCS]);
+
+  useEffect(() => {
+    if (quillRef.current) {
+      const quill = quillRef.current.getEditor();
+      if (quill) {
+        console.log("[ContentEditor] Attaching custom image handler...");
+        const toolbar = quill.getModule('toolbar');
+        if (toolbar) {
+          toolbar.addHandler('image', imageHandler);
+          console.log("[ContentEditor] Custom image handler attached.");
+        } else {
+          console.error("[ContentEditor] Quill toolbar module not found.");
+        }
+      } else {
+        console.error("[ContentEditor] Could not get Quill editor instance from ref.");
+      }
+    }
+  }, [imageHandler]);
+
   return (
     <Container maxWidth="lg">
       {initialDataLoading ? (
@@ -231,6 +333,7 @@ const ContentEditor: React.FC = () => {
                 }}
                 render={({ field: { onChange, value } }) => (
                   <ReactQuill
+                    ref={quillRef}
                     theme="snow"
                     value={value}
                     onChange={onChange}

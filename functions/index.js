@@ -2,6 +2,7 @@ const functions = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const {initializeApp} = require("firebase-admin/app");
 const {getAuth} = require("firebase-admin/auth");
+const {Storage} = require("@google-cloud/storage");
 
 // Initialize Firebase Admin SDK with explicit configuration
 initializeApp({
@@ -13,6 +14,10 @@ initializeApp({
 // Initialize Firestore with specific settings
 const firestore = admin.firestore();
 firestore.settings({ignoreUndefinedProperties: true});
+
+// Initialize Storage client
+const storage = new Storage();
+const bucketName = "thoughtcurrent-article-images"; // Update bucket name
 
 exports.createArticle = functions.https.onRequest(async (req, res) => {
   // Set CORS headers
@@ -632,3 +637,81 @@ exports.listPublicArticles = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+exports.generateSignedUploadUrl =
+  functions.https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      return res.status(204).send("");
+    }
+
+    if (req.method !== "POST") {
+      res.set("Allow", "POST");
+      return res.status(405).json({error: "Method Not Allowed"});
+    }
+
+    try {
+      console.log("generateSignedUploadUrl function invoked.");
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json(
+            {error: "Unauthorized: Missing Authorization"});
+      }
+      const idToken = authHeader.split("Bearer ")[1];
+
+      let decodedToken;
+      try {
+        decodedToken = await getAuth().verifyIdToken(idToken);
+        console.log("Token verified for UID:", decodedToken.uid);
+      } catch (error) {
+        console.error("Token verification failed:", error);
+        return res.status(401).json({error: "Unauthorized: Invalid Token"});
+      }
+
+      const {filename, contentType} = req.body;
+      if (!filename || !contentType) {
+        return res.status(400).json({
+          error: "Bad Request: Missing filename or contentType",
+        });
+      }
+
+      if (!contentType.startsWith("image/")) {
+        return res.status(400).json({
+          error: "Bad Request: Invalid content type, only images allowed.",
+        });
+      }
+
+      const filePath =
+      `user-uploads/${decodedToken.uid}/${Date.now()}-${filename}`;
+      const file = storage.bucket(bucketName).file(filePath);
+
+      const options = {
+        version: "v4",
+        action: "write",
+        expires: Date.now() + 10 * 60 * 1000,
+        contentType: contentType,
+      };
+
+      console.log(`Generating signed URL for: ${filePath}`);
+      const [signedUrl] = await file.getSignedUrl(options);
+      console.log("Signed URL generated successfully.");
+
+      const publicUrl = `https://storage.googleapis.com/${bucketName}/${filePath}`;
+
+      res.status(200).json({
+        success: true,
+        signedUrl: signedUrl,
+        publicUrl: publicUrl,
+      });
+    } catch (error) {
+      console.error("Error generating signed URL:", error);
+      res.status(500).json({
+        error: "Internal Server Error",
+        details: error.message,
+      });
+    }
+  });

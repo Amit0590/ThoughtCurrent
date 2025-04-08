@@ -20,6 +20,8 @@ import 'react-quill/dist/quill.snow.css';
 interface ArticleFormInputs {
   title: string;
   content: string;
+  categories: string; // Comma-separated string
+  tags: string;      // Comma-separated string
 }
 
 const quillModules = {
@@ -39,7 +41,9 @@ const ContentEditor: React.FC = () => {
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<ArticleFormInputs>({
     defaultValues: {
       title: '',
-      content: ''
+      content: '',
+      categories: '', // Initialize empty
+      tags: ''       // Initialize empty
     }
   });
   const [loading, setLoading] = useState(false);
@@ -85,7 +89,9 @@ const ContentEditor: React.FC = () => {
         if (response.ok) {
           reset({
             title: responseData.title,
-            content: responseData.content
+            content: responseData.content,
+            categories: (responseData.categories || []).join(', '),
+            tags: (responseData.tags || []).join(', ')
           });
         } else {
           throw new Error(responseData.error || `Failed to load article`);
@@ -122,6 +128,17 @@ const ContentEditor: React.FC = () => {
 
     setLoading(true);
 
+    // Process categories and tags
+    const categoriesArray = data.categories
+      .split(',')
+      .map(cat => cat.trim())
+      .filter(cat => cat.length > 0);
+    
+    const tagsArray = data.tags
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+
     try {
       const token = await auth.currentUser?.getIdToken(true);
       if (!token) {
@@ -132,6 +149,8 @@ const ContentEditor: React.FC = () => {
         title: data.title,
         content: data.content,
         authorName: user?.displayName || "Unknown Author",
+        categories: categoriesArray,
+        tags: tagsArray,
       };
 
       const baseUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net";
@@ -356,15 +375,33 @@ const ContentEditor: React.FC = () => {
                 {errors.content.message}
               </Typography>
             )}
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={loading || initialDataLoading}
-              sx={{ mt: 2 }}
-            >
-              {loading ? <CircularProgress size={24} /> : (isEditing ? 'Update Article' : 'Save Draft')}
-            </Button>
+            <TextField
+              label="Categories (comma-separated)"
+              fullWidth
+              margin="normal"
+              {...register("categories")}
+              variant="outlined"
+              helperText="Enter relevant categories, separated by commas (e.g., Politics, Economics, Society)"
+            />
+            <TextField
+              label="Tags (comma-separated)"
+              fullWidth
+              margin="normal"
+              {...register("tags")}
+              variant="outlined"
+              helperText="Enter relevant tags, separated by commas (e.g., policy, analysis, research)"
+            />
+            <Box sx={{ mt: 2 }}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={loading || initialDataLoading}
+                fullWidth
+              >
+                {loading ? <CircularProgress size={24} /> : (isEditing ? 'Update Article' : 'Save Draft')}
+              </Button>
+            </Box>
           </form>
         </Paper>
       )}
@@ -373,9 +410,9 @@ const ContentEditor: React.FC = () => {
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         message={snackbarMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
     </Container>
   );
 };
-
 export default ContentEditor;

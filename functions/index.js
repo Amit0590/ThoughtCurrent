@@ -413,6 +413,8 @@ exports.listArticles = functions.https.onRequest(async (req, res) => {
         updatedAt: data.updatedAt ?
           data.updatedAt.toDate().toISOString() :
           null,
+        categories: data.categories || [],
+        tags: data.tags || [],
       });
     });
 
@@ -624,6 +626,8 @@ exports.listPublicArticles = functions.https.onRequest(async (req, res) => {
         updatedAt: data.updatedAt && data.updatedAt.toDate ?
           data.updatedAt.toDate().toISOString() :
           data.updatedAt,
+        categories: data.categories || [],
+        tags: data.tags || [],
       });
     });
 

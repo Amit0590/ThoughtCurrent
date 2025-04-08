@@ -5,7 +5,7 @@ import Navigation from './components/Navigation';
 import LoginForm from './components/auth/LoginForm';
 import RegistrationForm from './components/auth/RegistrationForm';
 import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
-import ResetPasswordForm from './components/auth/ResetPasswordForm';
+import ResetPasswordForm from './components/auth/ResetPasswordForm';// Double check this import path
 import Dashboard from './components/Dashboard';
 import ContentEditor from './components/ContentEditor';
 import ArticleView from './components/ArticleView';

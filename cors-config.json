@@ -1,0 +1,18 @@
+[
+  {
+    "origin": [
+      "http://localhost:3000",
+      "https://psychic-fold-455618-b9.firebaseapp.com",
+      "https://psychic-fold-455618-b9.web.app"
+    ],
+    "method": ["PUT", "POST", "GET", "HEAD", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Authorization",
+      "Content-Length",
+      "User-Agent",
+      "x-goog-*"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

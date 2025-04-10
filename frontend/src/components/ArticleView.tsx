@@ -4,6 +4,8 @@ import { Container, Paper, Typography, CircularProgress, Alert, Box, Button, Dia
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { auth } from '../firebase';
+import CommentInput from './comments/CommentInput'; // Import CommentInput component
+import CommentThread from './comments/CommentThread'; // Add import for CommentThread
 
 // Add empty export to make this file a module
 export {};
@@ -91,6 +93,7 @@ const ArticleView: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const [comments, setComments] = useState<any[]>([]); // State to hold comments
 
   const handleClickOpenDeleteDialog = () => {
     setDeleteDialogOpen(true);
@@ -201,6 +204,13 @@ const ArticleView: React.FC = () => {
       console.log("[ArticleView - State Monitor] isAuthor after state update:", isAuthorCheck);
     }
   }, [article, currentUser?.id]);
+
+  const handleCommentPosted = (newComment: any) => {
+    console.log("New comment received in ArticleView:", newComment);
+    // Add the new comment to the beginning of the comments state array
+    // For nested comments, more complex logic is needed here or in fetching
+    setComments(prevComments => [newComment, ...prevComments]);
+  };
 
   if (loading) {
     return (
@@ -343,6 +353,31 @@ const ArticleView: React.FC = () => {
           </Box>
         )}
       </Paper>
+
+      {/* --- ADD Comment Input --- */}
+      {/* Only show if article loaded successfully */}
+      {article && (
+        <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, mt: 3, mb: 4 }}>
+          <Typography variant="h6" gutterBottom>Post a Comment</Typography>
+          <CommentInput
+            articleId={article.id}
+            onCommentPosted={handleCommentPosted}
+          />
+          {/* We will add comment display logic later */}
+          <Box sx={{mt: 3}}>
+            {/* Remove the <pre> block */}
+            {/* <pre>{JSON.stringify(comments, null, 2)}</pre> */}
+
+            {/* --- ADD Comment Thread Component --- */}
+            <CommentThread 
+              articleId={article.id} 
+              newComment={comments.length > 0 ? comments[0] : null} 
+            />
+            {/* --- END Comment Thread --- */}
+          </Box>
+        </Paper>
+      )}
+      {/* --- End Comment Input/Display Section --- */}
 
       <Dialog
         open={deleteDialogOpen}

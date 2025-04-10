@@ -719,3 +719,185 @@ exports.generateSignedUploadUrl =
       });
     }
   });
+
+exports.postComment = functions.https.onRequest(async (req, res) => {
+  // --- Set CORS headers ---
+  res.set("Access-Control-Allow-Origin", "*"); // Be specific in production
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+  // --- End CORS Headers ---
+
+  if (req.method !== "POST") {
+    res.set("Allow", "POST");
+    return res.status(405).json({error: "Method Not Allowed"});
+  }
+
+  try {
+    console.log("postComment function invoked.");
+
+    // 1. Authentication Check
+    const authHeader = req.headers.authorization || "";
+    if (!/^Bearer\s+/i.test(authHeader)) {
+      return res.status(401).json({
+        error: "Unauthorized: Authentication required",
+      });
+    }
+    const idToken = authHeader.replace(/Bearer\s+/i, "").trim();
+    let decodedToken;
+    try {
+      decodedToken = await getAuth().verifyIdToken(idToken);
+      console.log("[postComment] Token verified for UID:", decodedToken.uid);
+    } catch (error) {
+      console.error("[postComment] Token verification error:", error);
+      return res.status(401).json({error: "Unauthorized: Invalid token"});
+    }
+    const userId = decodedToken.uid;
+
+    // 2. Input Validation
+    const {articleId, text, parentCommentId} = req.body;
+
+    if (!articleId || typeof articleId !== "string") {
+      return res.status(400).json({
+        error: "Bad Request: Missing or invalid articleId.",
+      });
+    }
+    if (!text || typeof text !== "string" || text.trim().length === 0) {
+      return res.status(400).json({
+        error: "Bad Request: Comment text cannot be empty.",
+      });
+    }
+    if (parentCommentId && typeof parentCommentId !== "string") {
+      // If parentCommentId is provided, it must be a string
+      return res.status(400).json({
+        error: "Bad Request: Invalid parentCommentId.",
+      });
+    }
+
+    // Optional: Validate text length
+    if (text.length > 2000) { // Example limit
+      return res.status(400).json({
+        error: "Bad Request: Comment exceeds maximum length.",
+      });
+    }
+
+    // 3. Prepare Comment Data
+    const commentData = {
+      articleId: articleId,
+      userId: userId,
+      userName: decodedToken.name || "Anonymous", // Use display name from token
+      userPhotoUrl: decodedToken.picture || null, // Use photo URL from token
+      text: text, // Use provided text
+      parentCommentId: parentCommentId || null, // Set to null if not provided
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      isDeleted: false,
+      moderationStatus: "approved", // Default to approved for now
+    };
+    console.log("[postComment] Data to save:", commentData);
+
+    // 4. Add Document to Firestore 'comments' Collection
+    const commentsCollection = firestore.collection("comments");
+    const docRef = await commentsCollection.add(commentData);
+    console.log(
+        `[postComment] Comment added successfully with ID: ${docRef.id}`,
+    );
+
+    // 5. Prepare and Send Success Response
+    const savedComment = {id: docRef.id, ...commentData};
+    // Convert server timestamp for the response if needed immediately by client
+    if (savedComment.createdAt) {
+      // This won't be the *exact* server time yet, but close for optimistic UI
+      savedComment.createdAt = new Date().toISOString();
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Comment posted successfully",
+      comment: savedComment, // Send back the created comment data
+    });
+  } catch (error) {
+    console.error("[postComment] Error:", error);
+    return res.status(500).json({error: "Internal Server Error"});
+  }
+});
+
+exports.getComments = functions.https.onRequest(async (req, res) => {
+  // --- Set CORS headers ---
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+  // --- End CORS Headers ---
+
+  if (req.method !== "GET") {
+    res.set("Allow", "GET");
+    return res.status(405).json({error: "Method Not Allowed"});
+  }
+
+  try {
+    const articleId = req.query.articleId;
+
+    if (!articleId || typeof articleId !== "string") {
+      return res.status(400).json({
+        error: "Bad Request: Missing or invalid articleId.",
+      });
+    }
+
+    console.log(`[getComments] Fetching comments for articleId: ${articleId}`);
+
+    // --- Firestore Query ---
+    // Fetch top-level comments first (where parentCommentId is null)
+    // Order by creation date (oldest first for typical thread display)
+    const commentsCollection = firestore.collection("comments");
+    const query = commentsCollection
+        .where("articleId", "==", articleId)
+        .where("parentCommentId", "==", null) // Get top-level comments
+        .where("isDeleted", "==", false) // Exclude soft-deleted comments
+        .orderBy("createdAt", "asc") // Oldest first
+        .limit(50); // Limit top-level comments initially
+
+    const snapshot = await query.get();
+
+    const comments = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      comments.push({
+        id: doc.id, // Use the document ID as commentId
+        ...data,
+        // Convert timestamps - fix optional chaining syntax
+        createdAt:
+          data.createdAt && typeof data.createdAt.toDate === "function" ?
+          data.createdAt.toDate().toISOString() :
+          data.createdAt,
+        updatedAt:
+          data.updatedAt && typeof data.updatedAt.toDate === "function" ?
+          data.updatedAt.toDate().toISOString() :
+          data.updatedAt,
+      });
+    });
+    // --- End Firestore Query ---
+
+    // NOTE: Fetching replies (nested comments) requires additional queries
+    // or a different data structure. We'll handle replies later.
+    // For now, this returns only top-level comments.
+
+    console.log(
+        `[getComments] Returning 
+        ${comments.length} top-level comments for article ` +
+      `${articleId}.`,
+    );
+    return res.status(200).json(comments);
+  } catch (error) {
+    console.error("Error listing comments:", error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to retrieve comments",
+    });
+  }
+});

@@ -8,6 +8,8 @@ import {
   Snackbar,
   CircularProgress,
   Box,
+  Autocomplete, // Add Autocomplete
+  Chip          // Add Chip
 } from '@mui/material';
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { useSelector } from 'react-redux';
@@ -20,8 +22,8 @@ import 'react-quill/dist/quill.snow.css';
 interface ArticleFormInputs {
   title: string;
   content: string;
-  categories: string; // Comma-separated string
-  tags: string;      // Comma-separated string
+  categories: string[]; // Changed from string to string[]
+  tags: string[];      // Changed from string to string[]
 }
 
 const quillModules = {
@@ -42,8 +44,8 @@ const ContentEditor: React.FC = () => {
     defaultValues: {
       title: '',
       content: '',
-      categories: '', // Initialize empty
-      tags: ''       // Initialize empty
+      categories: [], // Changed from '' to []
+      tags: []       // Changed from '' to []
     }
   });
   const [loading, setLoading] = useState(false);
@@ -90,8 +92,8 @@ const ContentEditor: React.FC = () => {
           reset({
             title: responseData.title,
             content: responseData.content,
-            categories: (responseData.categories || []).join(', '),
-            tags: (responseData.tags || []).join(', ')
+            categories: responseData.categories || [], // Use arrays directly 
+            tags: responseData.tags || []           // Use arrays directly
           });
         } else {
           throw new Error(responseData.error || `Failed to load article`);
@@ -128,16 +130,7 @@ const ContentEditor: React.FC = () => {
 
     setLoading(true);
 
-    // Process categories and tags
-    const categoriesArray = data.categories
-      .split(',')
-      .map(cat => cat.trim())
-      .filter(cat => cat.length > 0);
-    
-    const tagsArray = data.tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
+    // Removed string splitting logic since data is already in arrays
 
     try {
       const token = await auth.currentUser?.getIdToken(true);
@@ -149,9 +142,11 @@ const ContentEditor: React.FC = () => {
         title: data.title,
         content: data.content,
         authorName: user?.displayName || "Unknown Author",
-        categories: categoriesArray,
-        tags: tagsArray,
+        categories: data.categories || [], // Use array directly
+        tags: data.tags || [],           // Use array directly
       };
+
+      console.log("Submitting article data:", requestBody); // Log to verify arrays
 
       const baseUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net";
       const functionUrl = isEditing 
@@ -375,22 +370,72 @@ const ContentEditor: React.FC = () => {
                 {errors.content.message}
               </Typography>
             )}
-            <TextField
-              label="Categories (comma-separated)"
-              fullWidth
-              margin="normal"
-              {...register("categories")}
-              variant="outlined"
-              helperText="Enter relevant categories, separated by commas (e.g., Politics, Economics, Society)"
+            
+            {/* Categories Autocomplete Input */}
+            <Controller
+              name="categories"
+              control={control}
+              render={({ field }) => (
+                <Autocomplete
+                  multiple // Allow multiple selections
+                  freeSolo // Allow arbitrary user input (not restricted to options)
+                  options={[]} // No predefined options needed for freeSolo
+                  value={field.value || []} // Controlled component value (ensure it's an array)
+                  onChange={(event, newValue) => {
+                    // newValue will be an array of strings (including new ones)
+                    field.onChange(newValue);
+                  }}
+                  renderTags={(value: readonly string[], getTagProps) =>
+                    value.map((option: string, index: number) => (
+                      <Chip variant="outlined" label={option} {...getTagProps({ index })} />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      variant="outlined"
+                      label="Categories"
+                      margin="normal"
+                      placeholder="Type category and press Enter"
+                      helperText="Enter relevant categories, press Enter after each."
+                    />
+                  )}
+                />
+              )}
             />
-            <TextField
-              label="Tags (comma-separated)"
-              fullWidth
-              margin="normal"
-              {...register("tags")}
-              variant="outlined"
-              helperText="Enter relevant tags, separated by commas (e.g., policy, analysis, research)"
+            
+            {/* Tags Autocomplete Input */}
+            <Controller
+              name="tags"
+              control={control}
+              render={({ field }) => (
+                <Autocomplete
+                  multiple
+                  freeSolo
+                  options={[]}
+                  value={field.value || []}
+                  onChange={(event, newValue) => {
+                     field.onChange(newValue);
+                  }}
+                  renderTags={(value: readonly string[], getTagProps) =>
+                    value.map((option: string, index: number) => (
+                      <Chip variant="outlined" label={option} {...getTagProps({ index })} />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      variant="outlined"
+                      label="Tags"
+                      margin="normal"
+                      placeholder="Type tag and press Enter"
+                      helperText="Enter relevant tags, press Enter after each."
+                    />
+                  )}
+                />
+              )}
             />
+            
             <Box sx={{ mt: 2 }}>
               <Button
                 type="submit"

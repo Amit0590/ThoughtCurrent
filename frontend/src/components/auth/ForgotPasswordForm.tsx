@@ -32,13 +32,33 @@ const ForgotPasswordForm: React.FC = () => {
     console.log("[ForgotPassword] Sending reset request for:", data.email);
 
     try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log("[ForgotPassword] Placeholder: Reset email sent successfully.");
-        setIsSuccess(true);
+      // Call the deployed Cloud Function
+      const functionUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/sendPasswordResetEmail";
+
+      const response = await fetch(functionUrl, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ email: data.email }), // Send email in body
+      });
+
+      const responseData = await response.json();
+
+      // Cloud Function always returns 200/success:true in this case
+      if (!response.ok || !responseData.success) {
+         // Log error but still show success UI for security
+         console.error("Error initiating password reset on backend:", responseData);
+      }
+
+      console.log("[ForgotPassword] Reset email process initiated on backend.");
+      setIsSuccess(true); // Show success message UI
     } catch (error: any) {
-      console.error("[ForgotPassword] Error:", error);
-      setSnackbarMessage(`Error: ${error.message}`);
-      setShowSnackbar(true);
+      // Handle network errors during fetch
+      console.error("[ForgotPassword] Network/Fetch Error:", error);
+      // Still show generic success UI for security, maybe log differently
+      setIsSuccess(true);
+      // For development purposes, you might want to see actual errors:
+      // setSnackbarMessage(`Error: Failed to send request. Please try again.`);
+      // setShowSnackbar(true);
     } finally {
       setLoading(false);
     }

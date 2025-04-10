@@ -1,6 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Paper, Typography, CircularProgress, Box, List, ListItem, Divider } from '@mui/material';
+import { 
+  Container, 
+  Paper, 
+  Typography, 
+  Box, 
+  List, 
+  ListItem, 
+  Divider,
+  Skeleton 
+} from '@mui/material';
+import { MenuBook as MenuBookIcon } from '@mui/icons-material';
 
 interface PublicArticle {
   id: string;
@@ -69,9 +79,17 @@ const PublicArticleList: React.FC = () => {
   if (loading) {
     return (
       <Container maxWidth="lg">
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
-          <CircularProgress />
-        </Box>
+        <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, mt: 4, mb: 4 }}>
+          <Skeleton variant="text" width={300} height={40} sx={{ mb: 3 }} />
+          {[...Array(4)].map((_, index) => (
+            <Box key={index} sx={{ mb: 4 }}>
+              <Skeleton variant="text" width="70%" height={32} />
+              <Skeleton variant="text" width="30%" height={24} sx={{ my: 1 }} />
+              <Skeleton variant="text" width="90%" />
+              <Skeleton variant="text" width="85%" />
+            </Box>
+          ))}
+        </Paper>
       </Container>
     );
   }
@@ -86,6 +104,25 @@ const PublicArticleList: React.FC = () => {
     );
   }
 
+  const EmptyState = () => (
+    <Box sx={{ 
+      textAlign: 'center', 
+      py: 6,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 2
+    }}>
+      <MenuBookIcon sx={{ fontSize: 80, color: 'text.secondary' }} />
+      <Typography variant="h6" color="text.secondary">
+        No Published Articles
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Check back soon for new content
+      </Typography>
+    </Box>
+  );
+
   return (
     <Container maxWidth="lg">
       <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, mt: 4, mb: 4 }}>
@@ -93,7 +130,7 @@ const PublicArticleList: React.FC = () => {
           Essays & Analysis
         </Typography>
         {articles.length === 0 ? (
-          <Typography sx={{ mt: 2 }}>No published articles found yet.</Typography>
+          <EmptyState />
         ) : (
           <List>
             {articles.map((article, index) => (

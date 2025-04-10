@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Container, Paper, Typography, CircularProgress, Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
+import { Container, Paper, Typography, CircularProgress, Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Skeleton } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { auth } from '../firebase';
@@ -36,6 +36,48 @@ const formatTimestamp = (timestamp: any): string => {
   } catch (e) {
     console.error("Error formatting timestamp:", e);
     return 'Invalid Date';
+  }
+};
+
+// Add article content styles
+const articleContentStyles = {
+  '& h1': { fontSize: '2.5rem', mb: 3, mt: 4 },
+  '& h2': { fontSize: '2rem', mb: 2.5, mt: 3.5 },
+  '& h3': { fontSize: '1.75rem', mb: 2, mt: 3 },
+  '& p': { mb: 2, lineHeight: 1.7 },
+  '& blockquote': {
+    borderLeft: '4px solid',
+    borderColor: 'primary.main',
+    pl: 2,
+    py: 1,
+    my: 2,
+    fontStyle: 'italic',
+  },
+  '& ul, & ol': { 
+    pl: 4, 
+    mb: 2,
+    '& li': {
+      mb: 1,
+    }
+  },
+  '& img': {
+    maxWidth: '100%',
+    height: 'auto',
+    borderRadius: 1,
+    my: 2
+  },
+  '& pre': {
+    backgroundColor: 'grey.900',
+    p: 2,
+    borderRadius: 1,
+    overflow: 'auto',
+    mb: 2
+  },
+  '& code': {
+    fontFamily: 'monospace',
+    backgroundColor: 'grey.900',
+    p: 0.5,
+    borderRadius: 0.5
   }
 };
 
@@ -163,9 +205,20 @@ const ArticleView: React.FC = () => {
   if (loading) {
     return (
       <Container maxWidth="md">
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
-          <CircularProgress />
-        </Box>
+        <Paper elevation={1} sx={{ p: { xs: 2, md: 4 }, mt: 4, mb: 4 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Skeleton variant="rectangular" height={40} width="60%" />
+            <Skeleton variant="text" width="30%" />
+            <Box sx={{ mt: 2 }}>
+              <Skeleton variant="rectangular" height={200} />
+              <Box sx={{ mt: 2 }}>
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} variant="text" sx={{ my: 1 }} />
+                ))}
+              </Box>
+            </Box>
+          </Box>
+        </Paper>
       </Container>
     );
   }
@@ -245,13 +298,10 @@ const ArticleView: React.FC = () => {
 
         <Box
           className="article-content"
-          sx={{ 
-            mt: 3, 
-            '& p': { mb: 2 }, 
-            '& strong': { fontWeight: 'bold' }, 
-            '& em': { fontStyle: 'italic' }, 
-            '& ul': { pl: 4 }, 
-            '& ol': { pl: 4 } 
+          sx={{
+            mt: 3,
+            color: 'text.primary',
+            ...articleContentStyles
           }}
           dangerouslySetInnerHTML={{ __html: article?.content || '' }}
         />

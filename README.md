@@ -4,30 +4,52 @@ A sophisticated platform for scholarly discourse and knowledge sharing, focusing
 
 ## Core Features
 
-### Authentication System
-- **Email/Password Authentication**
-  - Secure registration with email verification
-  - Login with email/password
-  - Form validation and error handling
-  - Password strength requirements
-  
-- **Social Authentication**
-  - Google Sign-in integration
-  - Seamless OAuth2.0 flow
-  - Profile data synchronization
+### Phase 1: Core Platform & Refinements (Completed ✅)
 
-- **Session Management**
-  - Persistent sessions using Firebase Auth
-  - Secure token management
-  - Automatic token refresh
-  - Protected route system
+*   **Authentication:**
+    *   [x] Email/Password Registration & Login (Firebase Auth)
+    *   [x] Google Sign-in (Redirect Flow via Firebase Auth)
+    *   [x] User Session Persistence
+    *   [x] Logout Functionality
+    *   [x] Protected Routes
+    *   [x] Custom Password Reset Flow
+    *   [x] Email Verification Flow
+*   **Content Management System (CMS):**
+    *   [x] Article CRUD (Create, Read, Update, Delete) via Cloud Functions & Firestore
+    *   [x] Rich Text Editor (`react-quill`) Integration
+    *   [x] Image Uploads (via Editor to Google Cloud Storage)
+    *   [x] Categories & Tags (Input & Storage/Display)
+    *   [x] Public Article Listing (`/essays`)
+    *   [x] User-Specific Article Listing (`/articles`)
+*   **Backend:**
+    *   [x] Cloud Functions for Auth/CMS API (Node.js, `firebase-functions/v2`)
+    *   [x] Firestore Database Setup (`articles` collection)
+    *   [x] Google Cloud Storage Setup (for images)
+    *   [x] Basic Firestore Security Rules & Indexes Deployed
+*   **Frontend:**
+    *   [x] Core Component Structure (React, TS, MUI, Redux, Router)
+    *   [x] Auth & CMS Component Implementation
+    *   [x] Redux State Management for Auth (Serializable state)
+    *   [x] Basic UI/UX Polish & Warning Fixes
 
-- **User Experience**
-  - Clean, modern Material-UI interface
-  - Responsive design
-  - Loading states and feedback
-  - Error notifications via Snackbar
-  - Dark theme support
+### Phase 2: Community Features (Starting Now 🚀)
+
+*   **Discussion System:**
+    *   [ ] Comment Posting & Display
+    *   [ ] Nested Replies
+    *   [ ] Real-time Updates (Optional)
+    *   [ ] Moderation Tools (Basic)
+    *   [ ] Notifications (Basic)
+*   **Collaboration Tools (Planned):**
+    *   [ ] Shared Workspaces
+    *   [ ] Real-time Document Editing
+    *   [ ] Research Group Management
+*   **Peer Review System (Planned):**
+    *   [ ] Review Assignment
+    *   [ ] Feedback Management
+
+### Phase 3: Premium Features & Monetization (Planned)
+*   Premium Content Delivery, Advanced Analytics, Resource Management, Subscriptions, etc.
 
 ## Technical Architecture
 

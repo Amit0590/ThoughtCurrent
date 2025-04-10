@@ -4,7 +4,6 @@ import {
   Container,
   Paper,
   Typography,
-  CircularProgress,
   Alert,
   Box,
   List,
@@ -12,7 +11,9 @@ import {
   Divider,
   IconButton,
   Button,
+  Skeleton,
 } from '@mui/material';
+import { Article as ArticleIcon } from '@mui/icons-material';
 import { auth } from '../firebase';
 
 interface Article {
@@ -98,9 +99,18 @@ const ArticleList: React.FC = () => {
   if (loading) {
     return (
       <Container maxWidth="lg">
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
-          <CircularProgress />
-        </Box>
+        <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, mt: 4, mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Skeleton variant="text" width={200} height={40} />
+            <Skeleton variant="rectangular" width={150} height={36} />
+          </Box>
+          {[...Array(3)].map((_, index) => (
+            <Box key={index} sx={{ mb: 3 }}>
+              <Skeleton variant="text" width="80%" height={28} />
+              <Skeleton variant="text" width="30%" height={24} />
+            </Box>
+          ))}
+        </Paper>
       </Container>
     );
   }
@@ -113,6 +123,33 @@ const ArticleList: React.FC = () => {
     );
   }
 
+  const EmptyState = () => (
+    <Box sx={{ 
+      textAlign: 'center', 
+      py: 4,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 2
+    }}>
+      <ArticleIcon sx={{ fontSize: 60, color: 'text.secondary' }} />
+      <Typography variant="h6" color="text.secondary">
+        No Articles Yet
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Create your first article to get started
+      </Typography>
+      <Button
+        component={Link}
+        to="/content/create"
+        variant="contained"
+        sx={{ mt: 2 }}
+      >
+        Write an Article
+      </Button>
+    </Box>
+  );
+
   return (
     <Container maxWidth="lg">
       <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, mt: 4, mb: 4 }}>
@@ -124,9 +161,7 @@ const ArticleList: React.FC = () => {
             Create New Article
           </Button>
         </Box>
-        {articles.length === 0 ? (
-          <Typography sx={{ mt: 2 }}>You haven't created any articles yet.</Typography>
-        ) : (
+        {articles.length === 0 ? <EmptyState /> : (
           <List>
             {articles.map((article, index) => (
               <React.Fragment key={article.id}>

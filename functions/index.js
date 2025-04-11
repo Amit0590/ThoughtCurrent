@@ -901,3 +901,74 @@ exports.getComments = functions.https.onRequest(async (req, res) => {
     });
   }
 });
+
+exports.getReplies = functions.https.onRequest(async (req, res) => {
+  // --- CORS ---
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+  if (req.method !== "GET") {
+    res.set("Allow", "GET");
+    return res.status(405).json({error: "Method Not Allowed"});
+  }
+  // --- End CORS ---
+
+  try {
+    const parentCommentId = req.query.parentId; // Get parentId from query
+    
+    console.log(`[getReplies] Request received with parentId: "${parentCommentId}"`);
+    console.log(`[getReplies] parentId type: ${typeof parentCommentId}`);
+    
+    console.log(
+        `[getReplies] Fetching replies for parentId: ${parentCommentId}`);
+
+    // --- Firestore Query ---
+    // Log the query we're about to execute
+    console.log(`[getReplies] Executing Firestore query: where("parentCommentId", "==", "${parentCommentId}")`);
+    
+    const commentsCollection = firestore.collection("comments");
+    const query = commentsCollection
+        .where("parentCommentId", "==", parentCommentId)// FilterByparentCmmntId
+        .where("isDeleted", "==", false)
+        .orderBy("createdAt", "asc") // Oldest replies first
+        .limit(50); // Limit replies initially
+
+    const snapshot = await query.get();
+    
+    console.log(`[getReplies] Query returned ${snapshot.size} documents`);
+
+    const replies = [];
+    if (!snapshot.empty) {
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        replies.push({
+          id: doc.id,
+          ...data,
+          // Use the fixed timestamp conversion approach (no optional chaining)
+          createdAt:
+            data.createdAt && typeof data.createdAt.toDate === "function" ?
+            data.createdAt.toDate().toISOString() :
+            data.createdAt,
+          updatedAt:
+            data.updatedAt && typeof data.updatedAt.toDate === "function" ?
+            data.updatedAt.toDate().toISOString() :
+            data.updatedAt,
+        });
+      });
+    }
+    // --- End Query ---
+
+    console.log(
+        `[getReplies] Returning ${replies.length} replies for parent ` +
+      `${parentCommentId}.`,
+    );
+    return res.status(200).json(replies);
+  } catch (error) {
+    console.error("Error listing replies:", error);
+    return res.status(500).json({error: "Internal Server Error"});
+  }
+});

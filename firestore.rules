@@ -2,62 +2,160 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions for common checks
+    // Common helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isAuthor(rsc) {
-      return isSignedIn() && rsc.data.authorId == request.auth.uid;
-    }
-
-    function hasValidFields(rsc) {
-      return rsc.data.title is string && 
-             rsc.data.content is string &&
-             rsc.data.authorName is string &&
-             rsc.data.authorId is string;
-    }
-
-    function hasValidStatus(rsc) {
-      let status = rsc.data.status;
-      return status in ['draft', 'published'];
-    }
-
+    // --- Articles Collection Rules ---
     match /articles/{articleId} {
-      // READ: Anyone can read published articles, author can read their own
-      allow read: if resource.data.status == 'published' ||
-                    isAuthor(resource);
+      // Helper Functions for articles
+      function isAuthor() {
+        // resource.data refers to the document *before* the change (for update/delete)
+        return isSignedIn() && resource.data.authorId == request.auth.uid;
+      }
+      
+      function isNewAuthor() {
+         // request.resource.data refers to the document *after* the change (for create/update)
+         return isSignedIn() && request.resource.data.authorId == request.auth.uid;
+      }
+      
+      function isPublished() {
+          return resource.data.status == 'published';
+      }
+      
+      function incomingDataIsPublished() {
+          return request.resource.data.status == 'published';
+      }
+      
+      function incomingDataIsDraft() {
+          return request.resource.data.status == 'draft';
+      }
+      
+      // Helper for field validation
+      function hasValidArticleFields(data) {
+        return data.title is string && data.title.size() > 0 && data.title.size() < 200 // Add size limits
+               && data.content is string // Allow empty content, maybe add size limit later
+               && data.authorId is string && data.authorId.size() > 0
+               && data.authorName is string && data.authorName.size() > 0
+               && data.status is string && data.status in ['draft', 'published']
+               // Validate categories/tags are lists (Firestore calls them lists)
+               && data.categories is list
+               && data.tags is list
+               // Optional: Limit array size
+               && data.categories.size() < 20
+               && data.tags.size() < 50;
+      }
 
-      // CREATE: Authenticated users can create drafts with correct author info
+      // --- READ ---
+      // Allow anyone to read PUBLISHED articles.
+      // Allow the AUTHOR to read their own DRAFT articles.
+      allow read: if isPublished() || isAuthor();
+
+      // --- CREATE ---
+      // Allow authenticated users to create their own DRAFTS with valid fields & server timestamps.
       allow create: if isSignedIn() &&
-                     request.resource.data.authorId == request.auth.uid &&
-                     request.resource.data.status == 'draft' &&
-                     hasValidFields(request.resource) &&
-                     hasValidStatus(request.resource) &&
+                     isNewAuthor() && // Check authorId being set matches creator
+                     incomingDataIsDraft() && // Must start as draft
+                     hasValidArticleFields(request.resource.data) &&
                      request.resource.data.createdAt == request.time &&
                      request.resource.data.updatedAt == request.time;
 
-      // UPDATE: Authors can update their articles with restrictions
-      allow update: if isAuthor(resource) &&
-                     hasValidFields(request.resource) &&
-                     hasValidStatus(request.resource) &&
-                     // Prevent changing critical fields
-                     request.resource.data.authorId == resource.data.authorId &&
-                     request.resource.data.createdAt == resource.data.createdAt &&
-                     // Enforce update timestamp
-                     request.resource.data.updatedAt == request.time &&
+      // --- UPDATE ---
+      // Allow authors to update their articles.
+      allow update: if isSignedIn() &&
+                     isAuthor() && // Must be the author of existing doc
+                     isNewAuthor() && // Must not change authorId
+                     hasValidArticleFields(request.resource.data) && // Validate incoming data
+                     request.resource.data.createdAt == resource.data.createdAt && // Cannot change createdAt
+                     request.resource.data.updatedAt == request.time && // Must use server timestamp for update
                      // Status transition rules
                      (
-                       // Can keep as draft
-                       (resource.data.status == 'draft' && request.resource.data.status == 'draft') ||
-                       // Can publish draft
-                       (resource.data.status == 'draft' && request.resource.data.status == 'published') ||
-                       // Can update published
-                       (resource.data.status == 'published' && request.resource.data.status == 'published')
+                       (resource.data.status == 'draft' && incomingDataIsDraft()) || // Draft -> Draft
+                       (resource.data.status == 'draft' && incomingDataIsPublished()) || // Draft -> Published
+                       (resource.data.status == 'published' && incomingDataIsPublished()) // Published -> Published (Allow edits)
+                       // Denies Published -> Draft implicitly
                      );
 
-      // DELETE: Only authors can delete their articles
-      allow delete: if isAuthor(resource);
+      // --- DELETE ---
+      // Allow authors to delete their articles.
+      allow delete: if isSignedIn() && isAuthor();
+
+    } // End match /articles/{articleId}
+
+    // --- START: Comments Collection Rules ---
+    match /comments/{commentId} {
+       // Helper: Is the user requesting this comment the author of the comment?
+       function isCommenter() {
+          // resource.data refers to the document *before* the change (for update/delete)
+          return isSignedIn() && resource.data.userId == request.auth.uid;
+       }
+
+       // Helper: Is the user creating this comment setting the correct userId?
+       function isCreatingOwnComment() {
+          // request.resource.data refers to the document *after* the change (for create/update)
+          return isSignedIn() && request.resource.data.userId == request.auth.uid;
+       }
+
+       // Helper: Validates required fields for a comment being created or updated
+       function hasValidCommentFields(commentData) {
+          return commentData.articleId is string && commentData.articleId.size() > 0
+                 && commentData.userId is string && commentData.userId.size() > 0
+                 && commentData.userName is string // Allow empty name initially? Maybe check size > 0
+                 // Allow userPhotoUrl to be null or string
+                 && (commentData.userPhotoUrl == null || commentData.userPhotoUrl is string)
+                 && commentData.text is string && commentData.text.size() > 0 && commentData.text.size() < 2000 // Size limit
+                 && (commentData.parentCommentId == null || commentData.parentCommentId is string) // Optional parent ID
+                 && commentData.isDeleted is bool
+                 && commentData.moderationStatus is string && commentData.moderationStatus == 'approved'; // Only allow creating approved for now
+       }
+
+       // --- READ ---
+       // Allow anyone to read comments that are NOT marked as deleted.
+       // Note: This currently allows reading comments even if the parent article is a draft.
+       // You could add '&& exists(/databases/$(database)/documents/articles/$(resource.data.articleId)) && get(...).data.status == 'published''
+       // to restrict reading to only comments on published articles, but this adds read costs.
+       allow read: if resource.data.isDeleted == false;
+
+       // --- CREATE ---
+       // Allow authenticated users to create comments
+       // IF the userId being set matches their own UID
+       // AND the comment data fields are valid
+       // AND timestamps are set by server.
+       allow create: if isSignedIn() &&
+                      isCreatingOwnComment() &&
+                      hasValidCommentFields(request.resource.data) &&
+                      request.resource.data.createdAt == request.time &&
+                       // Allow updatedAt to be set to the same server time on create
+                      request.resource.data.updatedAt == request.time;
+
+       // --- UPDATE ---
+       // Allow only the commenter (isCommenter) to update their OWN comment.
+       // Restrict updates to 'text', 'updatedAt', and 'isDeleted' fields.
+       allow update: if isSignedIn() &&
+                      isCommenter() &&
+                      // Fields that *can* be updated (and must be valid)
+                      request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() < 2000 &&
+                      request.resource.data.isDeleted is bool &&
+                      request.resource.data.updatedAt == request.time && // Must use server timestamp
+                      // Fields that *cannot* change
+                      request.resource.data.articleId == resource.data.articleId &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.userName == resource.data.userName &&
+                      request.resource.data.userPhotoUrl == resource.data.userPhotoUrl && // Don't allow changing photo via comment update
+                      request.resource.data.parentCommentId == resource.data.parentCommentId &&
+                      request.resource.data.createdAt == resource.data.createdAt &&
+                      request.resource.data.moderationStatus == resource.data.moderationStatus;
+
+       // --- DELETE ---
+       // Disallow hard deletes. Soft delete is handled via update rule setting isDeleted=true.
+       allow delete: if false;
+    } // End match /comments/{commentId}
+    // --- END: Comments Collection Rules ---
+
+    // Default rule (keep this at the end)
+    match /{document=**} {
+        allow read, write: if false;
     }
-  }
-}
+  } // End match /databases/{database}/documents
+} // End service cloud.firestore

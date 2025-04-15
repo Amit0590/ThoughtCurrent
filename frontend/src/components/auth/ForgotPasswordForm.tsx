@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { Link } from 'react-router-dom';
+import { FUNCTION_URLS } from '../../redux/api/articlesApi'; // Import the function URLs
 
 interface ForgotPasswordInputs {
   email: string;
@@ -33,7 +34,7 @@ const ForgotPasswordForm: React.FC = () => {
 
     try {
       // Call the deployed Cloud Function
-      const functionUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/sendPasswordResetEmail";
+      const functionUrl = FUNCTION_URLS.sendPasswordResetEmail;
 
       const response = await fetch(functionUrl, {
          method: 'POST',

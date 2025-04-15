@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Container, Paper, Typography, CircularProgress, Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Skeleton } from '@mui/material';
+import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Container, Paper, Typography, CircularProgress, Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Skeleton, Chip } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { auth } from '../firebase';
 import CommentInput from './comments/CommentInput'; // Import CommentInput component
 import CommentThread from './comments/CommentThread'; // Add import for CommentThread
+import { FUNCTION_URLS } from '../redux/api/articlesApi'; // Import the function URLs
 
 // Add empty export to make this file a module
 export {};
@@ -116,7 +117,7 @@ const ArticleView: React.FC = () => {
       const token = await auth.currentUser?.getIdToken(true);
       if (!token) throw new Error("Authentication token not found.");
 
-      const functionUrl = `https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/deleteArticle?id=${article.id}`;
+      const functionUrl = `${FUNCTION_URLS.deleteArticle}?id=${article.id}`;
 
       const response = await fetch(functionUrl, {
         method: 'DELETE',
@@ -154,7 +155,7 @@ const ArticleView: React.FC = () => {
 
       try {
         const token = await auth.currentUser?.getIdToken();
-        const functionUrl = `https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/getArticle?id=${articleId}`;
+        const functionUrl = `${FUNCTION_URLS.getArticle}?id=${articleId}`;
 
         const headers: HeadersInit = {
           'Content-Type': 'application/json',
@@ -264,7 +265,7 @@ const ArticleView: React.FC = () => {
         {isAuthor && (
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 1 }}>
             <Button
-              component={Link}
+              component={RouterLink}
               to={`/article/${article?.id}/edit`}
               variant="outlined"
               size="small"
@@ -316,42 +317,52 @@ const ArticleView: React.FC = () => {
           dangerouslySetInnerHTML={{ __html: article?.content || '' }}
         />
 
-        {/* Categories and Tags sections */}
-        {article?.categories && article.categories.length > 0 && (
-          <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(128, 128, 128, 0.2)' }}>
-            <Typography variant="overline">Categories:</Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-              {article.categories.map((cat, index) => (
-                <span key={index} style={{ 
-                  background: '#555', 
-                  padding: '2px 8px', 
-                  borderRadius: '4px', 
-                  fontSize: '0.8rem' 
-                }}>
-                  {cat}
-                </span>
-              ))}
+        {/* Enhanced Categories and Tags section */}
+        <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(128, 128, 128, 0.2)' }}>
+          {/* Categories */}
+          {article?.categories && article.categories.length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="overline" sx={{ display: 'inline-block', mr: 1 }}>Categories:</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                {article.categories.map((category, index) => (
+                  <Chip
+                    key={`cat-${index}`}
+                    label={category}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    component={RouterLink}
+                    to={`/category/${encodeURIComponent(category)}`}
+                    clickable
+                    sx={{ mr: 0.5, mb: 0.5 }}
+                  />
+                ))}
+              </Box>
             </Box>
-          </Box>
-        )}
+          )}
 
-        {article?.tags && article.tags.length > 0 && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="overline">Tags:</Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-              {article.tags.map((tag, index) => (
-                <span key={index} style={{ 
-                  background: '#444', 
-                  padding: '2px 8px', 
-                  borderRadius: '4px', 
-                  fontSize: '0.8rem' 
-                }}>
-                  {tag}
-                </span>
-              ))}
+          {/* Tags */}
+          {article?.tags && article.tags.length > 0 && (
+            <Box>
+              <Typography variant="overline" sx={{ display: 'inline-block', mr: 1 }}>Tags:</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                {article.tags.map((tag, index) => (
+                  <Chip
+                    key={`tag-${index}`}
+                    label={tag}
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                    component={RouterLink}
+                    to={`/tag/${encodeURIComponent(tag)}`}
+                    clickable
+                    sx={{ mr: 0.5, mb: 0.5 }}
+                  />
+                ))}
+              </Box>
             </Box>
-          </Box>
-        )}
+          )}
+        </Box>
       </Paper>
 
       {/* --- ADD Comment Input --- */}

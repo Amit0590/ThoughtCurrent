@@ -12,6 +12,7 @@ import {
 import { useSelector } from 'react-redux';
 import { RootState } from '../../redux/store';
 import CommentInput from './CommentInput';
+import { FUNCTION_URLS } from '../../redux/api/articlesApi'; // Import the function URLs
 
 // Define Comment interface (can share with backend/other components later)
 interface Comment {
@@ -64,7 +65,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment }) => {
         console.log(`[CommentItem] Fetching replies for comment.id: ${comment.id}`);
         
         try {
-            const functionUrl = `https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/getReplies?parentId=${comment.id}`;
+            const functionUrl = `${FUNCTION_URLS.getReplies}?parentId=${comment.id}`;
             console.log(`[CommentItem] Using getReplies URL: ${functionUrl}`);
             
             const response = await fetch(functionUrl);

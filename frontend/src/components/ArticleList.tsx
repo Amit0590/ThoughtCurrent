@@ -1,20 +1,23 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Container,
   Paper,
   Typography,
   Alert,
   Box,
-  List,
-  ListItem,
-  Divider,
-  IconButton,
+  Grid,
+  Card,
+  CardMedia,
+  CardContent,
+  CardActions,
   Button,
   Skeleton,
+  Chip,
 } from '@mui/material';
-import { Article as ArticleIcon } from '@mui/icons-material';
+import { Article as ArticleIcon, Edit as EditIcon } from '@mui/icons-material';
 import { auth } from '../firebase';
+import { FUNCTION_URLS } from '../redux/api/articlesApi'; // Import the function URLs
 
 interface Article {
   id: string;
@@ -22,6 +25,8 @@ interface Article {
   status: 'draft' | 'published';
   authorId: string;
   authorName?: string;
+  imageUrl?: string | null;
+  shortDescription?: string;
   content?: string;
   contentSnippet?: string;
   createdAt: string | any;
@@ -42,11 +47,11 @@ const formatDate = (dateString: string | undefined): string => {
 };
 
 const ArticleList: React.FC = () => {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [articles, setArticles] = React.useState<Article[]>([]);
+  const [loading, setLoading] = React.useState<boolean>(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchArticles = async () => {
       setLoading(true);
       setError(null);
@@ -61,7 +66,7 @@ const ArticleList: React.FC = () => {
           return;
         }
 
-        const functionUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/listArticles";
+        const functionUrl = FUNCTION_URLS.listArticles;
         const headers: HeadersInit = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -96,25 +101,33 @@ const ArticleList: React.FC = () => {
     return () => { isMounted = false; };
   }, []);
 
+  // Loading state
   if (loading) {
     return (
       <Container maxWidth="lg">
-        <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, mt: 4, mb: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Skeleton variant="text" width={200} height={40} />
-            <Skeleton variant="rectangular" width={150} height={36} />
-          </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, mt: 4 }}>
+          <Skeleton variant="text" width={200} height={40} />
+          <Skeleton variant="rectangular" width={150} height={36} />
+        </Box>
+        <Grid container spacing={3}>
           {[...Array(3)].map((_, index) => (
-            <Box key={index} sx={{ mb: 3 }}>
-              <Skeleton variant="text" width="80%" height={28} />
-              <Skeleton variant="text" width="30%" height={24} />
-            </Box>
+            <Grid item key={index} xs={12} sm={6} md={4}>
+              <Card sx={{ height: '100%' }}>
+                <Skeleton variant="rectangular" height={140} />
+                <CardContent>
+                  <Skeleton variant="text" height={28} />
+                  <Skeleton variant="text" width="60%" height={24} />
+                  <Skeleton variant="text" width="40%" />
+                </CardContent>
+              </Card>
+            </Grid>
           ))}
-        </Paper>
+        </Grid>
       </Container>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <Container maxWidth="lg">
@@ -140,7 +153,7 @@ const ArticleList: React.FC = () => {
         Create your first article to get started
       </Typography>
       <Button
-        component={Link}
+        component={RouterLink}
         to="/content/create"
         variant="contained"
         sx={{ mt: 2 }}
@@ -153,48 +166,102 @@ const ArticleList: React.FC = () => {
   return (
     <Container maxWidth="lg">
       <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4" component="h1">
             My Articles
           </Typography>
-          <Button component={Link} to="/content/create" variant="contained">
+          <Button component={RouterLink} to="/content/create" variant="contained">
             Create New Article
           </Button>
         </Box>
+
         {articles.length === 0 ? <EmptyState /> : (
-          <List>
-            {articles.map((article, index) => (
-              <React.Fragment key={article.id}>
-                <ListItem
-                  alignItems="flex-start"
-                  secondaryAction={
-                    <IconButton
-                      edge="end"
-                      aria-label="edit"
-                      component={Link}
+          <Grid container spacing={4}>
+            {articles.map((article) => (
+              <Grid item key={article.id} xs={12} sm={6} md={4}>
+                <Card sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  height: '100%',
+                  transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-5px)',
+                    boxShadow: 4
+                  }
+                }}>
+                  <CardMedia
+                    component="img"
+                    height="160"
+                    image={article.imageUrl || `https://source.unsplash.com/random/400x200/?abstract&sig=${article.id}`}
+                    alt={article.title}
+                    sx={{ objectFit: 'cover' }}
+                  />
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Box sx={{ mb: 1 }}>
+                      <Chip
+                        label={article.status === 'published' ? 'Published' : 'Draft'}
+                        color={article.status === 'published' ? 'success' : 'default'}
+                        size="small"
+                        variant="outlined"
+                        sx={{ mb: 1 }}
+                      />
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Last Updated: {formatDate(article.updatedAt)}
+                      </Typography>
+                    </Box>
+                    <Typography 
+                      gutterBottom 
+                      variant="h6" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: 'medium',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                      }}
+                    >
+                      {article.title}
+                    </Typography>
+                    {article.shortDescription && (
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary" 
+                        sx={{ 
+                          mt: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                      >
+                        {article.shortDescription}
+                      </Typography>
+                    )}
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'space-between', mt: 'auto' }}>
+                    <Button
+                      size="small"
+                      component={RouterLink}
+                      to={`/article/${article.id}`}
+                    >
+                      View
+                    </Button>
+                    <Button
+                      size="small"
+                      component={RouterLink}
                       to={`/article/${article.id}/edit`}
+                      startIcon={<EditIcon />}
                     >
                       Edit
-                    </IconButton>
-                  }
-                  sx={{ flexDirection: 'column', pr: 10 }}
-                >
-                  <Typography
-                    component={Link}
-                    to={`/article/${article.id}`}
-                    variant="h6"
-                    sx={{ textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline' }, mb: 0.5 }}
-                  >
-                    {article.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" component="div">
-                    Status: {article.status} | Updated: {formatDate(article.updatedAt)}
-                  </Typography>
-                </ListItem>
-                {index < articles.length - 1 && <Divider component="li" />}
-              </React.Fragment>
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
             ))}
-          </List>
+          </Grid>
         )}
       </Paper>
     </Container>

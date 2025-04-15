@@ -58,6 +58,14 @@ exports.createArticle = functions.https.onRequest(async (req, res) => {
       name: decodedToken.name,
     });
 
+    // Get data from request body, including status,
+    // shortDescription, and imageUrl
+    const {
+      shortDescription,
+      status,
+      imageUrl,
+    } = req.body;
+
     // Validate required fields
     if (!req.body.title || typeof req.body.title !== "string") {
       return res.status(400).json({
@@ -66,17 +74,37 @@ exports.createArticle = functions.https.onRequest(async (req, res) => {
       });
     }
 
+    // Validate status
+    const finalStatus = (status === "published") ? "published" : "draft";
+    console.log(
+        `[createArticle] Received status: 
+          "${status}", Final status: "${finalStatus}"`,
+    );
+
     // Prepare article data with correct authorId
     const articleData = {
       title: req.body.title.trim(),
       content: req.body.content || "",
       authorId: decodedToken.uid, // Ensure authorId is set from token
       authorName: decodedToken.name || "Anonymous Author",
-      status: "draft",
-      categories: Array.isArray(req.body.categories) ? req.body.categories : [],
-      tags: Array.isArray(req.body.tags) ? req.body.tags : [],
+      status: finalStatus, // Use the validated status from request
+      categories: Array.isArray(req.body.categories) ?
+        req.body.categories :
+        [],
+      tags: Array.isArray(req.body.tags) ?
+        req.body.tags :
+        [],
+      shortDescription: typeof shortDescription === "string" ?
+        shortDescription :
+        "",
+      imageUrl:
+        typeof imageUrl === "string" ? imageUrl : null, // Add imageUrl field
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      // Set publishedAt ONLY if published
+      publishedAt: finalStatus === "published" ?
+        admin.firestore.FieldValue.serverTimestamp() :
+        null,
     };
 
     console.log("[createArticle] Data to save in Firestore:", articleData);
@@ -87,7 +115,7 @@ exports.createArticle = functions.https.onRequest(async (req, res) => {
     return res.status(201).json({
       success: true,
       articleId: docRef.id,
-      message: "Article draft created successfully",
+      message: `Article ${finalStatus} created successfully`,
     });
   } catch (error) {
     console.error("Error processing request:", error);
@@ -116,7 +144,7 @@ exports.createArticle = functions.https.onRequest(async (req, res) => {
 });
 
 exports.getArticle = functions.https.onRequest(async (req, res) => {
-  // Set CORS headers
+  // Set CORS headers - make sure these are at the top of the function
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -214,12 +242,18 @@ exports.getArticle = functions.https.onRequest(async (req, res) => {
       status: articleStatus,
       authorId: articleData.authorId, // Explicitly include authorId
       authorName: articleData.authorName,
+      shortDescription:
+        articleData.shortDescription || "", // shortDescription to the response
+      imageUrl: articleData.imageUrl || null, // Also include imageUrl present
       createdAt: articleData.createdAt ?
         articleData.createdAt.toDate().toISOString() :
         null,
       updatedAt: articleData.updatedAt ?
         articleData.updatedAt.toDate().toISOString() :
         null,
+      publishedAt: articleData.publishedAt ?
+        articleData.publishedAt.toDate().toISOString() :
+        null, // Include publishedAt date
       tags: articleData.tags || [],
       categories: articleData.categories || [],
     };
@@ -263,8 +297,8 @@ exports.updateArticle = functions.https.onRequest(async (req, res) => {
     const articleId = req.query.id;
     if (!articleId || typeof articleId !== "string") {
       return res.status(400).json({
-        error: "Invalid Request",
-        message: "Missing or invalid ID parameter",
+        error: "Bad Request",
+        message: "Article ID is required in the query parameters",
       });
     }
 
@@ -273,7 +307,7 @@ exports.updateArticle = functions.https.onRequest(async (req, res) => {
     if (!/^Bearer\s+/i.test(authHeader)) {
       return res.status(401).json({
         error: "Unauthorized",
-        message: "Authorization header must be in format: Bearer <token>",
+        message: "Invalid authorization header",
       });
     }
 
@@ -281,54 +315,104 @@ exports.updateArticle = functions.https.onRequest(async (req, res) => {
     const decodedToken = await getAuth().verifyIdToken(idToken);
     const userId = decodedToken.uid;
 
-    // Get update data
-    const {title, content, categories, tags} = req.body;
+    // FIX: Get ALL update data from request body,
+    // including status, shortDescription, and imageUrl
+    const {
+      title,
+      content,
+      categories,
+      tags,
+      shortDescription, // Added missing field
+      status, // Added missing field
+      imageUrl,
+    } = req.body;
 
     // Validate fields
     if (!title || typeof title !== "string" || title.trim() === "") {
-      return res.status(400).json({error: "Bad Request: Title is required"});
+      return res.status(400).json({
+        error: "Bad Request",
+        message: "Title is required and must be a non-empty string",
+      });
     }
     if (content === undefined || typeof content !== "string") {
-      return res.status(400).json(
-          {
-            error: "Bad Request: Content must be a string",
-          });
+      return res.status(400).json({
+        error: "Bad Request",
+        message: "Content must be a string",
+      });
     }
+
+    // Validate status
+    const finalStatus = (status === "published") ? "published" : "draft";
+    console.log(
+        `[updateArticle] Received status: 
+        "${status}", Final status: "${finalStatus}"`);
 
     // Get article reference and check ownership
     const articleRef = firestore.collection("articles").doc(articleId);
     const docSnap = await articleRef.get();
 
     if (!docSnap.exists) {
-      return res.status(404).json({error: "Not Found: Article not found."});
+      return res.status(404).json({
+        error: "Not Found",
+        message: `Article with ID ${articleId} does not exist`,
+      });
     }
 
     const existingData = docSnap.data();
     if (existingData.authorId !== userId) {
       return res.status(403).json({
         error: "Forbidden",
-        message: "Not authorized to modify this article",
+        message: "You are not authorized to update this article",
       });
     }
 
-    // Update document
+    // FIX: Update data now includes status, shortDescription, and imageUrl
     const updateData = {
       title: title.trim(),
       content: content,
-      categories: Array.isArray(categories) ?
-        categories :
-        existingData.categories || [],
-      tags: Array.isArray(tags) ?
-        tags :
-        existingData.tags || [],
+      categories:
+        Array.isArray(categories) ? categories : existingData.categories || [],
+      tags: Array.isArray(tags) ? tags : existingData.tags || [],
+      shortDescription:
+        typeof shortDescription === "string" ? shortDescription :
+          existingData.shortDescription || "",
+      imageUrl:
+        typeof imageUrl === "string" ? imageUrl :
+          (existingData.imageUrl !== undefined ? existingData.imageUrl : null),
+      status: finalStatus, // Added missing field
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    await articleRef.update(updateData);
+    // Handle publishedAt logic
+    const wasPublished = existingData.status === "published";
+    const isPublishing = finalStatus === "published";
+
+    if (isPublishing && !wasPublished) {
+      updateData.publishedAt = admin.firestore.FieldValue.serverTimestamp();
+      console.log(
+          `[updateArticle] Setting publishedAt for article ${articleId}`);
+    } else if (!isPublishing && wasPublished) {
+      updateData.publishedAt = null;
+      console.log(`
+        [updateArticle] Clearing publishedAt for article ${articleId}`);
+    }
+
+    console.log(`[updateArticle] Data to update for ${articleId}:`, updateData);
+
+    // Perform the update with error handling
+    try {
+      await articleRef.update(updateData);
+      console.log(`[updateArticle] Successfully updated article ${articleId}`);
+    } catch (dbError) {
+      console.error(
+          `[updateArticle] Firestore update failed for ${articleId}:`,
+          dbError);
+      throw new Error(`Database update failed: ${dbError.message}`);
+    }
 
     return res.status(200).json({
       success: true,
-      message: "Article updated successfully",
+      message: `Article status set to ${finalStatus} and updated successfully`,
       articleId: articleId,
     });
   } catch (error) {
@@ -337,7 +421,7 @@ exports.updateArticle = functions.https.onRequest(async (req, res) => {
     if (error.code === "auth/id-token-expired") {
       return res.status(401).json({
         error: "Token Expired",
-        message: "Your session has expired. Please sign in again.",
+        message: "Your authentication token has expired. Please log in again.",
       });
     }
 
@@ -406,13 +490,15 @@ exports.listArticles = functions.https.onRequest(async (req, res) => {
         status: data.status,
         authorId: data.authorId,
         authorName: data.authorName,
-        contentSnippet: (data.content || "").substring(0, 100) + "...",
-        createdAt: data.createdAt ?
-          data.createdAt.toDate().toISOString() :
-          null,
-        updatedAt: data.updatedAt ?
-          data.updatedAt.toDate().toISOString() :
-          null,
+        // Add imageUrl to returned data
+        imageUrl: data.imageUrl || null,
+        shortDescription: data.shortDescription || null,
+        // Include both timestamps for display
+        createdAt:
+          data.createdAt ? data.createdAt.toDate().toISOString() : null,
+        updatedAt:
+          data.updatedAt ? data.updatedAt.toDate().toISOString() : null,
+        // Include categories and tags for filtering
         categories: data.categories || [],
         tags: data.tags || [],
       });
@@ -582,62 +668,83 @@ exports.deleteArticle = functions.https.onRequest(async (req, res) => {
 });
 
 exports.listPublicArticles = functions.https.onRequest(async (req, res) => {
+  // --- CORS ---
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).send("");
-  }
-
+  res.set(
+      "Access-Control-Allow-Headers", "Content-Type, Authorization",
+  ); // Already includes Authorization
+  if (req.method === "OPTIONS") return res.status(204).send("");
   if (req.method !== "GET") {
     res.set("Allow", "GET");
     return res.status(405).json({error: "Method Not Allowed"});
   }
+  // --- End CORS ---
 
   try {
-    console.log("listPublicArticles function invoked.");
+    // --- Check for Filter Parameters ---
+    const categoryFilter = req.query.category;
+    const tagFilter = req.query.tag;
+    const limit = parseInt(String(req.query.limit)) || 20; // Default limit
+
+    console.log(
+        `[listPublicArticles] Request received. 
+      Category: "${categoryFilter}", Tag: "${tagFilter}"`);
 
     const articlesCollection = firestore.collection("articles");
-    const query = articlesCollection
-        .where("status", "==", "published")
-        .orderBy("createdAt", "desc")
-        .limit(20);
+    let query = articlesCollection; // Initialize query
 
-    console.log("[listPublicArticles] Querying published articles...");
+    // --- Apply Filters ---
+    query = query.where("status", "==", "published"); // Always filter published
+
+    if (categoryFilter && typeof categoryFilter === "string") {
+      console.log(
+          `[listPublicArticles] Filtering by category: ${categoryFilter}`);
+      // Use array-contains for filtering arrays
+      query = query.where("categories", "array-contains", categoryFilter);
+    } else if (tagFilter && typeof tagFilter === "string") {
+      console.log(`[listPublicArticles] Filtering by tag: ${tagFilter}`);
+      // Use array-contains for filtering arrays
+      query = query.where("tags", "array-contains", tagFilter);
+    }
+
+    // --- Order and Limit ---
+    query = query.orderBy("publishedAt", "desc").limit(limit);
+
     const snapshot = await query.get();
 
     if (snapshot.empty) {
-      console.log("No published articles found.");
+      console.log(`[listPublicArticles] No articles found matching filter.`);
       return res.status(200).json([]);
     }
 
-    const articles = [];
-    snapshot.forEach((doc) => {
+    const articles = snapshot.docs.map((doc) => {
       const data = doc.data();
-      articles.push({
+      return {
         id: doc.id,
-        title: data.title,
-        authorName: data.authorName,
-        contentSnippet: (data.content || "").substring(0, 200) + "...",
-        createdAt: data.createdAt && data.createdAt.toDate ?
+        title: data.title || "",
+        authorName: data.authorName || "Unknown Author",
+        authorId: data.authorId,
+        publishedAt: data.publishedAt ?
+          data.publishedAt.toDate().toISOString() :
+          null,
+        createdAt: data.createdAt ?
           data.createdAt.toDate().toISOString() :
-          data.createdAt,
-        updatedAt: data.updatedAt && data.updatedAt.toDate ?
-          data.updatedAt.toDate().toISOString() :
-          data.updatedAt,
+          null,
+        shortDescription: data.shortDescription || "",
+        content: data.content || "",
         categories: data.categories || [],
         tags: data.tags || [],
-      });
+      };
     });
 
     console.log(`[listPublicArticles] Returning ${articles.length} articles.`);
     return res.status(200).json(articles);
   } catch (error) {
-    console.error("Error listing public articles:", error);
+    console.error("[listPublicArticles] Error:", error);
     return res.status(500).json({
       error: "Internal Server Error",
-      message: "Failed to retrieve published articles",
+      message: "Failed to retrieve articles",
     });
   }
 });
@@ -919,17 +1026,20 @@ exports.getReplies = functions.https.onRequest(async (req, res) => {
 
   try {
     const parentCommentId = req.query.parentId; // Get parentId from query
-    
-    console.log(`[getReplies] Request received with parentId: "${parentCommentId}"`);
+
+    console.log(
+        `[getReplies] Request received with parentId: "${parentCommentId}"`);
     console.log(`[getReplies] parentId type: ${typeof parentCommentId}`);
-    
+
     console.log(
         `[getReplies] Fetching replies for parentId: ${parentCommentId}`);
 
     // --- Firestore Query ---
     // Log the query we're about to execute
-    console.log(`[getReplies] Executing Firestore query: where("parentCommentId", "==", "${parentCommentId}")`);
-    
+    console.log(
+        `[getReplies] Executing Firestore query: 
+        where("parentCommentId", "==", "${parentCommentId}")`);
+
     const commentsCollection = firestore.collection("comments");
     const query = commentsCollection
         .where("parentCommentId", "==", parentCommentId)// FilterByparentCmmntId
@@ -938,7 +1048,7 @@ exports.getReplies = functions.https.onRequest(async (req, res) => {
         .limit(50); // Limit replies initially
 
     const snapshot = await query.get();
-    
+
     console.log(`[getReplies] Query returned ${snapshot.size} documents`);
 
     const replies = [];
@@ -970,5 +1080,150 @@ exports.getReplies = functions.https.onRequest(async (req, res) => {
   } catch (error) {
     console.error("Error listing replies:", error);
     return res.status(500).json({error: "Internal Server Error"});
+  }
+});
+
+// --- New Function: getHomepageArticles ---
+exports.getHomepageArticles = functions.https.onRequest(async (req, res) => {
+  // Set CORS headers
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  // Handle preflight request
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+
+  // We only support GET requests for this endpoint
+  if (req.method !== "GET") {
+    res.set("Allow", "GET");
+    return res.status(405).json({error: "Method Not Allowed"});
+  }
+
+  const firestore = admin.firestore();
+  const articlesRef = firestore.collection("articles");
+  const numArticles = 6; // Number of articles to display on the homepage
+
+  console.log(
+      `[getHomepageArticles] Fetching latest 
+      ${numArticles} published articles.`);
+
+  try {
+    // First try to find articles with publishedAt field
+    let snapshot = await articlesRef
+        .where("status", "==", "published")
+        .orderBy("publishedAt", "desc")
+        .limit(numArticles)
+        .get();
+
+    // If no results, fall back to createdAt
+    // (for backward compatibility with older articles)
+    if (snapshot.empty) {
+      console.log(
+          `[getHomepageArticles] 
+            No articles with publishedAt found, using createdAt fallback.`);
+      snapshot = await articlesRef
+          .where("status", "==", "published")
+          .orderBy("createdAt", "desc")
+          .limit(numArticles)
+          .get();
+    }
+
+    if (snapshot.empty) {
+      console.log("[getHomepageArticles] No published articles found.");
+      return res.status(200).json([]);
+    }
+
+    // Map documents to desired output structure, converting Timestamps
+    const articles = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        title: data.title || "",
+        authorName: data.authorName || "Unknown Author",
+        // Convert Firestore Timestamps to ISO strings for JSON serialization
+        publishedAt: data.publishedAt ?
+          data.publishedAt.toDate().toISOString() :
+          (data.createdAt ? data.createdAt.toDate().toISOString() : null),
+        // Include other fields needed for the homepage card
+        imageUrl: data.imageUrl || null,
+        shortDescription: data.shortDescription || "",
+        categories: data.categories || [],
+        tags: data.tags || [],
+        // Generate plain text snippet from
+        // content if shortDescription is missing
+        contentSnippet: !data.shortDescription && data.content ?
+          data.content.replace(/<[^>]*>/g, "").substring(0, 150) + "..." :
+          "",
+      };
+    });
+
+    console.log(
+        `[getHomepageArticles] Successfully fetched 
+        ${articles.length} articles.`);
+    return res.status(200).json(articles);
+  } catch (error) {
+    console.error("[getHomepageArticles] Error fetching articles:", error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to retrieve featured articles",
+    });
+  }
+});
+// --- End of New Function ---
+
+exports.corsProxy = functions.https.onRequest(async (req, res) => {
+  // Set CORS headers
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+
+  try {
+    // Extract target function and parameters from the request
+    const targetFunction = req.query.fn; // e.g., "getArticle"
+    if (!targetFunction) {
+      return res.status(400).json({error: "Missing target function name"});
+    }
+
+    // Build the target URL
+    const baseUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net";
+    const targetUrl = `${baseUrl}/${targetFunction}`;
+
+    // Forward all query parameters except 'fn'
+    const params = new URLSearchParams();
+    Object.entries(req.query).forEach(([key, value]) => {
+      if (key !== "fn") params.append(key, value);
+    });
+
+    const url = params.toString() ?
+      `${targetUrl}?${params.toString()}` :
+      targetUrl;
+
+    // Forward the request with the same method and headers
+    const headers = {...req.headers};
+    delete headers.host; // Remove host header
+
+    // Fetch options
+    const fetchOptions = {
+      method: req.method,
+      headers,
+      body:
+        ["POST", "PUT"].includes(
+            req.method) ? JSON.stringify(req.body) : undefined,
+    };
+
+    const response = await fetch(url, fetchOptions);
+    const data = await response.json();
+
+    // Forward the response status and data
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error("CORS Proxy Error:", error);
+    res.status(500).json({error: "Error in CORS proxy"});
   }
 });

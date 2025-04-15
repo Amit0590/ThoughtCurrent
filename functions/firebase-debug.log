@@ -1,0 +1,28 @@
+[debug] [2025-04-12T05:30:00.012Z] ----------------------------------------------------------------------
+[debug] [2025-04-12T05:30:00.015Z] Command:       /home/roshanubuntu/.nvm/versions/node/v22.14.0/bin/node /home/roshanubuntu/.nvm/versions/node/v22.14.0/bin/firebase deploy --only firestore:indexes
+[debug] [2025-04-12T05:30:00.016Z] CLI Version:   14.1.0
+[debug] [2025-04-12T05:30:00.016Z] Platform:      linux
+[debug] [2025-04-12T05:30:00.016Z] Node Version:  v22.14.0
+[debug] [2025-04-12T05:30:00.017Z] Time:          Sat Apr 12 2025 11:00:00 GMT+0530 (India Standard Time)
+[debug] [2025-04-12T05:30:00.017Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-04-12T05:30:00.257Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-04-12T05:30:00.258Z] > authorizing via signed-in user (a02157850@gmail.com)
+[debug] [2025-04-12T05:30:00.258Z] [iam] checking project psychic-fold-455618-b9 for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2025-04-12T05:30:00.259Z] Checked if tokens are valid: true, expires at: 1744437269666
+[debug] [2025-04-12T05:30:00.259Z] Checked if tokens are valid: true, expires at: 1744437269666
+[debug] [2025-04-12T05:30:00.260Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/psychic-fold-455618-b9:testIamPermissions [none]
+[debug] [2025-04-12T05:30:00.260Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/psychic-fold-455618-b9:testIamPermissions x-goog-quota-user=projects/psychic-fold-455618-b9
+[debug] [2025-04-12T05:30:00.260Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/psychic-fold-455618-b9:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2025-04-12T05:30:02.142Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/psychic-fold-455618-b9:testIamPermissions 200
+[debug] [2025-04-12T05:30:02.142Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/psychic-fold-455618-b9:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'psychic-fold-455618-b9'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2025-04-12T05:30:02.156Z] Checked if tokens are valid: true, expires at: 1744437269666
+[debug] [2025-04-12T05:30:02.156Z] Checked if tokens are valid: true, expires at: 1744437269666
+[debug] [2025-04-12T05:30:02.156Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/psychic-fold-455618-b9:test [none]
+[debug] [2025-04-12T05:30:02.157Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/psychic-fold-455618-b9:test [omitted]

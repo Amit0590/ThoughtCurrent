@@ -4,6 +4,7 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../redux/store'; // Adjust path if needed
 import { auth } from '../../firebase'; // Adjust path if needed
+import { FUNCTION_URLS } from '../../redux/api/articlesApi'; // Import the function URLs
 
 interface CommentInputProps {
     articleId: string;
@@ -49,7 +50,7 @@ const CommentInput: React.FC<CommentInputProps> = ({ articleId, parentCommentId 
                 // authorName and userPhotoUrl will be set by backend from token
             };
 
-            const functionUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/postComment";
+            const functionUrl = FUNCTION_URLS.postComment;
 
             const response = await fetch(functionUrl, {
                 method: 'POST',

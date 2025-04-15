@@ -25,18 +25,24 @@ A sophisticated platform for scholarly discourse and knowledge sharing, focusing
     *   [x] Cloud Functions for Auth/CMS API (Node.js, `firebase-functions/v2`)
     *   [x] Firestore Database Setup (`articles` collection)
     *   [x] Google Cloud Storage Setup (for images)
-    *   [x] Basic Firestore Security Rules & Indexes Deployed
+    *   [x] Firestore Security Rules & Indexes Deployed (for `articles`)
 *   **Frontend:**
     *   [x] Core Component Structure (React, TS, MUI, Redux, Router)
     *   [x] Auth & CMS Component Implementation
     *   [x] Redux State Management for Auth (Serializable state)
     *   [x] Basic UI/UX Polish & Warning Fixes
 
-### Phase 2: Community Features (Starting Now 🚀)
+### Phase 2: Community Features (In Progress ⏳)
 
 *   **Discussion System:**
-    *   [ ] Comment Posting & Display
-    *   [ ] Nested Replies
+    *   [x] Firestore Data Model (`comments` collection)
+    *   [x] Comment Posting (Top-Level & Replies via Cloud Function `postComment`)
+    *   [x] Comment Viewing (Top-Level via Cloud Function `getComments`)
+    *   [x] Reply Viewing (via Cloud Function `getReplies`, loaded on demand)
+    *   [x] Basic Nested Display (Frontend Components: `CommentThread`, `CommentItem`, `CommentInput`)
+    *   [x] Firestore Security Rules & Indexes Deployed (for `comments`)
+    *   [ ] Comment Editing
+    *   [ ] Comment Deletion (Soft Delete)
     *   [ ] Real-time Updates (Optional)
     *   [ ] Moderation Tools (Basic)
     *   [ ] Notifications (Basic)

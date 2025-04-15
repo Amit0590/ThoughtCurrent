@@ -6,10 +6,24 @@ This project is a web application built with React, Firebase, and Google Cloud P
 
 ## Current Development Phase & Status
 
-*   **Phase:** Starting **Phase 2: Community Features**.
-*   **Phase 1 Status:** **Completed.** Foundational infrastructure on GCP, core authentication flows (Email/Pass, Google, PW Reset, Email Verify), and core CMS CRUD operations (Create, Read, Update, Delete, List Public/Private, Rich Text Editor, Image Uploads, Categories/Tags) are implemented and functional. Basic Firestore rules are in place. Redux non-serializable warnings fixed.
-*   **Current Focus (Phase 2 Start):** Begin implementation of the **Discussion System** (comments on articles).
+*   **Phase:** Actively working on **Phase 2: Community Features**.
+*   **Phase 1 Status:** **Completed.** Foundational infrastructure, core authentication flows, core CMS CRUD operations, image uploads, category/tag handling, public/private article lists, Rich Text Editor, and basic Firestore security rules/indexes are implemented and functional. Key console warnings addressed.
+*   **Phase 2 Status (Discussion System):** Basic comment/reply posting and viewing functionality implemented. Backend Cloud Functions (`postComment`, `getComments`, `getReplies`) deployed. Frontend components (`CommentInput`, `CommentItem`, `CommentThread`) created and integrated. Firestore rules and indexes for `comments` deployed.
+*   **Current Focus:** Continue refining Discussion System (e.g., Editing, Deletion, Real-time updates) or move to other Phase 2 features.
 *   **Known Issues (Minor):** COOP warnings (Codespaces dev only), Quill deprecation warnings, minor UI polish needed (e.g., autocomplete attributes).
+
+## Google Cloud Platform Service Mapping
+
+*   **User Authentication & Management:** Google Cloud Identity Platform (Firebase Auth)
+*   **Backend API & Business Logic:** Google Cloud Functions (Node.js) - Handles articles (CRUD, list), comments (CRUD, list), signed URLs.
+*   **Primary Data Storage:** Google Cloud Firestore (`articles`, `comments` collections)
+*   **File/Media Storage:** Google Cloud Storage (`thoughtcurrent-article-images` bucket)
+*   **Asynchronous Tasks & Notifications:** Google Cloud Pub/Sub (Planned)
+*   **CI/CD (Build & Deployment):** Google Cloud Build (Planned)
+*   **Monitoring & Logging:** Google Cloud Logging & Monitoring
+*   **Hosting (Frontend - Dev):** Create React App Dev Server
+*   **Hosting (Frontend - Prod Options):** Firebase Hosting, Cloud Storage Static Site, Cloud Run.
+*   **AI/ML Features (Future):** Vertex AI, AutoML, Cloud Natural Language API, Recommendation AI (Potential)
 
 ## Project Structure
 

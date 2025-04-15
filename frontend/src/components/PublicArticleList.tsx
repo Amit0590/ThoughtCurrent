@@ -11,6 +11,7 @@ import {
   Skeleton 
 } from '@mui/material';
 import { MenuBook as MenuBookIcon } from '@mui/icons-material';
+import { FUNCTION_URLS } from '../redux/api/articlesApi'; // Import the function URLs
 
 interface PublicArticle {
   id: string;
@@ -51,7 +52,7 @@ const PublicArticleList: React.FC = () => {
       console.log("[PublicArticleList] Fetching public articles...");
 
       try {
-        const functionUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/listPublicArticles";
+        const functionUrl = FUNCTION_URLS.listPublicArticles;
         console.log("[PublicArticleList] Using function URL:", functionUrl);
 
         const response = await fetch(functionUrl, { method: 'GET' });

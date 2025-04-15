@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress, Alert, List } from '@mui/material';
 import CommentItem from './CommentItem'; // Import CommentItem
+import { FUNCTION_URLS } from '../../redux/api/articlesApi'; // Import the function URLs
 
 // Define Comment interface (can share)
 interface Comment {
@@ -34,7 +35,7 @@ const CommentThread: React.FC<CommentThreadProps> = ({ articleId, newComment }) 
             console.log(`[CommentThread] Fetching comments for article: ${articleId}`);
 
             try {
-                const functionUrl = `https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/getComments?articleId=${articleId}`;
+                const functionUrl = `${FUNCTION_URLS.getComments}?articleId=${articleId}`;
 
                 const response = await fetch(functionUrl, { method: 'GET' });
                 const responseData = await response.json();

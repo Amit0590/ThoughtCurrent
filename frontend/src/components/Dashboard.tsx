@@ -72,7 +72,7 @@ const Dashboard: React.FC = () => {
         <Box sx={{ mt: 2 }}>
           <Button
             component={Link}
-            to="/content/create"
+            to="/content/create" // Make sure this path is correct
             variant="contained"
             color="primary"
           >

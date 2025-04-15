@@ -12,6 +12,8 @@ import ArticleView from './components/ArticleView';
 import ArticleList from './components/ArticleList';
 import ActionHandler from './components/auth/ActionHandler';
 import PublicArticleList from './components/PublicArticleList';
+import HomePage from './components/HomePage'; // Import the new HomePage component
+import FilteredArticleList from './components/FilteredArticleList'; // Import the new component
 import { RootState, AppDispatch } from './redux/store';
 import { handleRedirectResult, auth } from './firebase';
 import { loginSuccess } from './redux/slices/authSlice'; // Import loginSuccess
@@ -129,6 +131,13 @@ const App: React.FC = () => {
         <>
             <Navigation />
             <Routes>
+                <Route path="/" element={<HomePage />} />
+                
+                {/* Add new filter routes */}
+                <Route path="/category/:name" element={<FilteredArticleList filterType="category" />} />
+                <Route path="/tag/:name" element={<FilteredArticleList filterType="tag" />} />
+                
+                {/* ...other existing routes... */}
                 <Route path="/login" element={
                     <RedirectIfAuthenticated>
                         <LoginForm />
@@ -175,8 +184,7 @@ const App: React.FC = () => {
                     }
                 />
                 <Route path="/auth/action" element={<ActionHandler />} />
-                <Route path="/essays" element={<PublicArticleList />} />
-                <Route path="/" element={<Navigate to="/login" />} />
+                <Route path="/essays" element={<PublicArticleList />} /> {/* Keep the essays route */}
             </Routes>
         </>
     );

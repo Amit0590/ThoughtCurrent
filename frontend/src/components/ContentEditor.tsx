@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Container,
   Paper,
@@ -8,46 +8,69 @@ import {
   Snackbar,
   CircularProgress,
   Box,
-  Autocomplete, // Add Autocomplete
-  Chip          // Add Chip
+  Autocomplete,
+  Chip,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio
 } from '@mui/material';
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
 import { auth } from '../firebase';
 import { useNavigate, useParams } from 'react-router-dom';
-import ReactQuill from 'react-quill';
+import ReactQuill, { Quill } from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { 
+  useCreateArticleMutation, 
+  useUpdateArticleMutation, 
+  useGetArticleByIdQuery, 
+  FUNCTION_URLS
+} from '../redux/api/articlesApi';
+import { v4 as uuidv4 } from 'uuid';
+import { debounce } from 'lodash';
 
+// Create Delta constructor from Quill
+const Delta = Quill.import('delta');
+
+// Update the form inputs interface
 interface ArticleFormInputs {
   title: string;
   content: string;
-  categories: string[]; // Changed from string to string[]
-  tags: string[];      // Changed from string to string[]
+  categories: string[];
+  tags: string[];
+  shortDescription: string;
+  status: 'draft' | 'published';
 }
-
-const quillModules = {
-  toolbar: [
-    [{ 'header': [1, 2, 3, false] }],
-    ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-    [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
-    ['link', 'image'],
-    ['clean']
-  ]
-} as const;
 
 const ContentEditor: React.FC = () => {
   const { articleId } = useParams<{ articleId: string }>();
   const isEditing = Boolean(articleId);
   const navigate = useNavigate();
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<ArticleFormInputs>({
+  
+  // RTK Query hooks
+  const [createArticle, { isLoading: isCreating }] = useCreateArticleMutation();
+  const [updateArticle, { isLoading: isUpdating }] = useUpdateArticleMutation();
+  const { data: articleData, isLoading: isArticleLoading } = 
+    useGetArticleByIdQuery(articleId || '', { skip: !articleId });
+  
+  const { register, handleSubmit, control, reset, setValue, formState: { errors } } = useForm<ArticleFormInputs>({
     defaultValues: {
       title: '',
       content: '',
-      categories: [], // Changed from '' to []
-      tags: []       // Changed from '' to []
+      categories: [],
+      tags: [],
+      shortDescription: '',
+      status: 'draft'
     }
   });
+  
+  // Add state for pending uploads
+  const [pendingUploads, setPendingUploads] = useState<Map<string, File>>(new Map());
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [showSnackbar, setShowSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -55,6 +78,7 @@ const ContentEditor: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const quillRef = useRef<ReactQuill>(null);
 
+  // Check auth
   useEffect(() => {
     const checkAuth = async () => {
       const currentUser = auth.currentUser;
@@ -65,59 +89,124 @@ const ContentEditor: React.FC = () => {
     checkAuth();
   }, [navigate]);
 
+  // Load article data when editing
   useEffect(() => {
-    const loadArticleForEdit = async () => {
-      if (!isEditing || !articleId) {
-        setInitialDataLoading(false);
-        return;
-      }
+    if (articleData && isEditing) {
+      reset({
+        title: articleData.title || '',
+        content: articleData.content || '',
+        categories: articleData.categories || [],
+        tags: articleData.tags || [],
+        shortDescription: articleData.shortDescription || '',
+        status: articleData.status || 'draft'
+      });
+      setInitialDataLoading(false);
+    } else if (!isArticleLoading && !articleData && isEditing) {
+      // Article not found or error fetching
+      setSnackbarMessage("Could not load article. It may have been deleted or you don't have permission to view it.");
+      setShowSnackbar(true);
+      navigate('/dashboard');
+    } else if (!isEditing) {
+      setInitialDataLoading(false);
+    }
+  }, [articleData, isEditing, isArticleLoading, navigate, reset]);
 
-      setInitialDataLoading(true);
-
-      try {
-        const token = await auth.currentUser?.getIdToken();
-        const functionUrl = `https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/getArticle?id=${articleId}`;
-
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-        };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(functionUrl, { method: 'GET', headers });
-        const responseData = await response.json();
-
-        if (response.ok) {
-          reset({
-            title: responseData.title,
-            content: responseData.content,
-            categories: responseData.categories || [], // Use arrays directly 
-            tags: responseData.tags || []           // Use arrays directly
-          });
-        } else {
-          throw new Error(responseData.error || `Failed to load article`);
-        }
-      } catch (error: any) {
-        setSnackbarMessage(`Error loading article: ${error.message}`);
-        setShowSnackbar(true);
-        navigate('/dashboard');
-      } finally {
-        setInitialDataLoading(false);
-      }
-    };
-
-    loadArticleForEdit();
-  }, [articleId, isEditing, navigate, reset]);
-
-  const onValidationError = (errors: any) => {
-    setSnackbarMessage("Please fix the errors in the form.");
+  const onValidationError = () => {
+    setSnackbarMessage("Please fix the errors highlighted in the form.");
     setShowSnackbar(true);
   };
 
+  // Helper function to process pending images
+  const processPendingImages = async (
+    currentContent: string,
+    uploadsMap: Map<string, File>
+  ): Promise<{ finalHtml: string; primaryImageUrl: string | null }> => {
+    console.log(`[processPendingImages] Processing ${uploadsMap.size} pending images.`);
+    let primaryImageUrl: string | null = null;
+
+    if (uploadsMap.size === 0) {
+      return { finalHtml: currentContent, primaryImageUrl };
+    }
+
+    // Use DOMParser to safely handle HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(currentContent, 'text/html');
+    const imagesToUpload: { element: HTMLImageElement; tempId: string; file: File }[] = [];
+
+    // Find images with the pending attribute that are still in the map
+    doc.querySelectorAll('img[data-pending-upload-id]').forEach(imgElement => {
+      const tempId = imgElement.getAttribute('data-pending-upload-id');
+      if (tempId && uploadsMap.has(tempId)) {
+        imagesToUpload.push({
+          element: imgElement as HTMLImageElement,
+          tempId: tempId,
+          file: uploadsMap.get(tempId)!
+        });
+      } else if (tempId) {
+        // Image was likely deleted from editor, remove from map
+        uploadsMap.delete(tempId);
+      }
+    });
+
+    if (imagesToUpload.length === 0) {
+      console.log("[processPendingImages] No pending images found in current content.");
+      return { finalHtml: currentContent, primaryImageUrl };
+    }
+
+    console.log(`[processPendingImages] Found ${imagesToUpload.length} images to upload.`);
+
+    // Create upload promises
+    const uploadPromises = imagesToUpload.map(async ({ tempId, file }) => {
+      try {
+        const publicUrl = await uploadSingleImage(file);
+        return { tempId, publicUrl, success: true };
+      } catch (error) {
+        console.error(`Failed to upload image with tempId ${tempId}:`, error);
+        return { tempId, publicUrl: null, success: false, error };
+      }
+    });
+
+    // Wait for all uploads to settle
+    const results = await Promise.allSettled(uploadPromises);
+
+    // Process results and update image elements
+    let allSucceeded = true;
+    results.forEach((result, index) => {
+      const { element, tempId, file } = imagesToUpload[index];
+      if (result.status === 'fulfilled' && result.value.success && result.value.publicUrl) {
+        console.log(`[processPendingImages] Replacing ${tempId} with ${result.value.publicUrl}`);
+        element.setAttribute('src', result.value.publicUrl);
+        element.removeAttribute('data-pending-upload-id');
+        
+        // Set the first successful upload as the primary image URL
+        if (primaryImageUrl === null) {
+          primaryImageUrl = result.value.publicUrl;
+          console.log(`[processPendingImages] Set primary image URL to: ${primaryImageUrl}`);
+        }
+      } else {
+        allSucceeded = false;
+        const errorMsg = result.status === 'rejected' ? result.reason : (result.value as any).error;
+        console.error(`[processPendingImages] Upload failed for ${tempId} (${file.name}):`, errorMsg);
+        element.setAttribute('style', 'border: 2px solid red; opacity: 0.5;');
+        element.removeAttribute('data-pending-upload-id');
+      }
+    });
+
+    // Serialize the modified document back to HTML
+    const finalHtml = doc.body.innerHTML;
+
+    if (!allSucceeded) {
+      throw new Error("One or more image uploads failed. Please review the content and try again.");
+    }
+
+    console.log("[processPendingImages] Image processing complete.");
+    return { finalHtml, primaryImageUrl };
+  };
+  
+  // Modified onSubmit function with deferred image upload logic
   const onSubmit: SubmitHandler<ArticleFormInputs> = async (data) => {
     if (!user) {
-      setSnackbarMessage('You must be logged in to save drafts');
+      setSnackbarMessage('You must be logged in to save articles');
       setShowSnackbar(true);
       return;
     }
@@ -129,162 +218,335 @@ const ContentEditor: React.FC = () => {
     }
 
     setLoading(true);
+    setIsUploadingImages(true);
+    setSnackbarMessage("Processing images...");
+    setShowSnackbar(true);
 
-    // Removed string splitting logic since data is already in arrays
+    const quill = quillRef.current?.getEditor();
+    if (!quill) {
+      setSnackbarMessage("Editor not available.");
+      setShowSnackbar(true);
+      setLoading(false);
+      setIsUploadingImages(false);
+      return;
+    }
+
+    let finalContent = data.content;
+    let primaryImageUrl: string | null = null;
 
     try {
+      // Process pending images - upload and replace URLs
+      const imageProcessingResult = await processPendingImages(finalContent, pendingUploads);
+      finalContent = imageProcessingResult.finalHtml;
+      primaryImageUrl = imageProcessingResult.primaryImageUrl;
+      
+      // Clear pending uploads after successful processing
+      setPendingUploads(new Map());
+      setIsUploadingImages(false);
+      
+      setSnackbarMessage("Saving article...");
+      setShowSnackbar(true);
+
       const token = await auth.currentUser?.getIdToken(true);
       if (!token) {
         throw new Error("Authentication token not found.");
       }
 
-      const requestBody = {
+      // Prepare article data with processed content
+      const articleData = {
         title: data.title,
-        content: data.content,
+        content: finalContent, // Use processed content with uploaded image URLs
+        shortDescription: data.shortDescription,
+        status: data.status,
         authorName: user?.displayName || "Unknown Author",
-        categories: data.categories || [], // Use array directly
-        tags: data.tags || [],           // Use array directly
+        categories: data.categories || [],
+        tags: data.tags || [],
+        imageUrl: primaryImageUrl, // Add the primary image URL
       };
 
-      console.log("Submitting article data:", requestBody); // Log to verify arrays
+      console.log("[onSubmit] Submitting final article data:", articleData);
 
-      const baseUrl = "https://us-central1-psychic-fold-455618-b9.cloudfunctions.net";
-      const functionUrl = isEditing 
-        ? `${baseUrl}/updateArticle?id=${articleId}` // Updated URL for edit mode
-        : `${baseUrl}/createArticle`;
-
-      const response = await fetch(functionUrl, {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const responseData = await response.json();
-      console.log("[onSubmit] Response Status OK:", response.ok);
-      console.log("[onSubmit] Response Data:", responseData);
-
-      if (response.ok && responseData && responseData.success === true) {
-        console.log("[onSubmit] Success conditions met!");
-        const successMessage = isEditing 
-          ? `Article updated! ID: ${articleId}` 
-          : `Article draft saved! ID: ${responseData.articleId}`;
+      // Use RTK Query mutations
+      let result;
+      if (isEditing && articleId) {
+        console.log(`[onSubmit] Updating existing article ${articleId}`);
+        result = await updateArticle({
+          id: articleId,
+          article: articleData
+        }).unwrap();
+        console.log(`[onSubmit] Update result:`, result);
         
-        console.log("[onSubmit] Setting Snackbar message:", successMessage);
-        setSnackbarMessage(successMessage);
-        setShowSnackbar(true);
-        console.log("[onSubmit] setShowSnackbar(true) called.");
-        
-        // Delay navigation to allow Snackbar to show
-        setTimeout(() => {
-          navigate(isEditing ? `/article/${articleId}` : '/dashboard');
-        }, 1500);
+        if (result.success) {
+          console.log(`[onSubmit] Update successful, article ID: ${articleId}`);
+        }
       } else {
-        console.error("[onSubmit] Success conditions NOT met.", {
-          responseOk: response.ok,
-          responseData
-        });
-        throw new Error(
-          responseData?.error || 
-          responseData?.message || 
-          `Request failed with status ${response.status}`
-        );
+        result = await createArticle(articleData).unwrap();
       }
-    } catch (error: any) {
-      console.error("[onSubmit] Caught error:", error);
-      setSnackbarMessage(`Error saving draft: ${error.message}`);
+
+      // Handle success - keep existing logic
+      const returnedArticleId = isEditing ? articleId : 
+        ('articleId' in result ? result.articleId : undefined);
+        
+      if (!returnedArticleId) {
+        throw new Error("Failed to get article ID from response");
+      }
+
+      const successMsg = data.status === 'published'
+        ? `Article ${isEditing ? 'updated and published' : 'published'}! ID: ${returnedArticleId}`
+        : `Article draft ${isEditing ? 'updated' : 'saved'}! ID: ${returnedArticleId}`;
+
+      setSnackbarMessage(successMsg);
       setShowSnackbar(true);
+
+      // Navigate based on status
+      setTimeout(() => {
+        navigate(data.status === 'published' ? `/article/${returnedArticleId}` : '/articles');
+      }, 1500);
+    } catch (error: any) {
+      console.error("[onSubmit] Error:", error);
+      setSnackbarMessage(`Error: ${error.message || 'Failed to save article'}`);
+      setShowSnackbar(true);
+      // Don't clear pendingUploads on error so user can retry
     } finally {
       setLoading(false);
+      setIsUploadingImages(false);
     }
   };
 
-  const handleCloseSnackbar = () => setShowSnackbar(false);
-
-  const uploadImageToGCS = useCallback(async (file: File) => {
+  // Helper function to upload a single image
+  const uploadSingleImage = async (file: File): Promise<string> => {
     if (!auth.currentUser) {
-      setSnackbarMessage('Error: Must be logged in to upload images.');
-      setShowSnackbar(true);
-      return;
+      throw new Error('User not authenticated for image upload.');
     }
+    
+    console.log(`[uploadSingleImage] Uploading: ${file.name}`);
+    const token = await auth.currentUser.getIdToken(true);
+    if (!token) throw new Error('Could not get auth token.');
 
-    setLoading(true);
-    setSnackbarMessage('Uploading image...');
-    setShowSnackbar(true);
+    const signedUrlFunctionUrl = FUNCTION_URLS.generateSignedUploadUrl;
 
+    let getUrlResponse, signedUrlData;
     try {
-      const token = await auth.currentUser.getIdToken(true);
-      if (!token) throw new Error('Could not get auth token.');
-
-      const signedUrlFunctionUrl = 
-        'https://us-central1-psychic-fold-455618-b9.cloudfunctions.net/generateSignedUploadUrl';
-      
-      const getUrlResponse = await fetch(signedUrlFunctionUrl, {
+      getUrlResponse = await fetch(signedUrlFunctionUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
+        body: JSON.stringify({ 
+          filename: file.name, 
+          contentType: file.type 
         }),
       });
-
-      if (!getUrlResponse.ok) {
-        const errorData = await getUrlResponse.json();
-        throw new Error(errorData.error || 'Failed to get upload URL.');
+      
+      signedUrlData = await getUrlResponse.json();
+      if (!getUrlResponse.ok || !signedUrlData.signedUrl) {
+        throw new Error(signedUrlData.error || 'Failed to get upload URL.');
       }
+    } catch (err: any) {
+      console.error("Error getting signed URL:", err);
+      throw new Error(`Failed to get upload URL for ${file.name}: ${err.message}`);
+    }
 
-      const { signedUrl, publicUrl } = await getUrlResponse.json();
-
-      const uploadResponse = await fetch(signedUrl, {
+    try {
+      const uploadResponse = await fetch(signedUrlData.signedUrl, {
         method: 'PUT',
-        headers: {
-          'Content-Type': file.type,
-        },
+        headers: { 'Content-Type': file.type },
         body: file,
       });
 
       if (!uploadResponse.ok) {
-        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+        throw new Error(`GCS upload failed: ${uploadResponse.statusText}`);
       }
-
-      const quill = quillRef.current?.getEditor();
-      if (quill) {
-        const range = quill.getSelection(true);
-        quill.insertEmbed(range.index, 'image', publicUrl);
-        quill.setSelection(range.index + 1, 0);
-      }
-
-      setSnackbarMessage('Image uploaded successfully!');
-    } catch (error: any) {
-      console.error('Image upload error:', error);
-      setSnackbarMessage(`Upload failed: ${error.message}`);
-    } finally {
-      setLoading(false);
-      setShowSnackbar(true);
-      setTimeout(() => setShowSnackbar(false), 4000);
+      
+      console.log(`[uploadSingleImage] Successfully uploaded: ${file.name}`);
+      return signedUrlData.publicUrl; // Return the final GCS URL
+    } catch (err: any) {
+      console.error("Error uploading to GCS:", err);
+      throw new Error(`Failed to upload ${file.name} to GCS: ${err.message}`);
     }
-  }, [setSnackbarMessage, setShowSnackbar, setLoading]);
+  };
 
+  // --- Function to handle file processing (used by both button handler and paste handler) ---
+  const processAndPreviewImage = debounce((file: File) => {
+    console.log('Processing file for preview:', file.name);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64DataUrl = e.target?.result as string;
+      if (base64DataUrl && quillRef.current) {
+        const quill = quillRef.current.getEditor();
+        const range = quill.getSelection(true);
+        
+        // Generate a unique ID for this pending image
+        const tempId = `pending-${uuidv4()}`;
+
+        // Store the file in pendingUploads
+        setPendingUploads(prevMap => {
+          const newMap = new Map(prevMap);
+          newMap.set(tempId, file);
+          console.log(`[processAndPreviewImage] Added ${tempId} to pending uploads. Map size: ${newMap.size}`);
+          return newMap;
+        });
+
+        // Insert image with data URL - Fix: use string literal 'user' instead of Quill.sources.USER
+        quill.insertEmbed(range.index, 'image', base64DataUrl, 'user');
+        
+        // Apply our custom attribute to track the image
+        // Use timeout to ensure embed is in DOM before formatting
+        setTimeout(() => {
+          quill.formatText(range.index, 1, { 'data-pending-upload-id': tempId });
+          // Fix: set selection with correct parameters (index, length, source)
+          quill.setSelection(range.index + 1, 0, 'silent');
+          console.log(`[processAndPreviewImage] Inserted preview for ${tempId}`);
+        }, 0);
+      }
+    };
+    
+    reader.onerror = (error) => {
+      console.error("FileReader error:", error);
+      setSnackbarMessage("Error reading file for preview.");
+      setShowSnackbar(true);
+    };
+    
+    reader.readAsDataURL(file);
+  }, 100); // 100ms debounce time
+
+  // --- Modified imageHandler to use the shared processing function ---
   const imageHandler = useCallback(() => {
+    console.log("Custom image handler triggered");
     const input = document.createElement('input');
     input.setAttribute('type', 'file');
     input.setAttribute('accept', 'image/*');
     input.click();
 
-    input.onchange = async () => {
+    input.onchange = () => {
       const files = input.files;
       if (files && files.length > 0) {
         const file = files[0];
         console.log('Selected file:', file);
-        await uploadImageToGCS(file);
+        processAndPreviewImage(file);
       }
     };
-  }, [uploadImageToGCS]);
+  }, [processAndPreviewImage]);
+
+  // --- Define Quill modules with custom clipboard matchers ---
+  const quillModules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+        [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
+        ['link', 'image'],
+        ['clean']
+      ],
+      handlers: {
+        'image': imageHandler
+      }
+    },
+    clipboard: {
+      // Custom matcher for pasted images
+      matchers: [
+        ['img', (node: HTMLImageElement, delta: any) => {
+          // Check if the src is a data URL
+          if (node.src && node.src.startsWith('data:image/')) {
+            console.log("[Clipboard Matcher] Intercepted pasted data URL image");
+            // Return empty delta to prevent default insertion
+            // We'll handle it in the text-change event handler
+            return new Delta();
+          }
+          // For non-data URLs, let Quill handle normally
+          return delta;
+        }]
+      ]
+    },
+    // Ensure keyboard module is enabled to handle keyboard inputs
+    keyboard: {
+      bindings: {}
+    }
+  }), [imageHandler]);
+
+  // --- Effect to handle pasted/dropped images ---
+  useEffect(() => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
+
+    const handleTextChange = (delta: any, oldDelta: any, source: string) => {
+      // Only process user changes (paste/drop) - Fix: use string literal 'user' instead of Quill.sources.USER
+      if (source !== 'user') return;
+
+      // Check for inserted images with data URLs
+      delta.ops?.forEach((op: any) => {
+        if (op.insert && typeof op.insert === 'object' && op.insert.image) {
+          const imageUrl = op.insert.image;
+          
+          // Process data URLs without our pending ID
+          if (typeof imageUrl === 'string' && 
+              imageUrl.startsWith('data:image/') && 
+              (!op.attributes || !op.attributes['data-pending-upload-id'])) {
+            
+            console.log('[text-change] Detected pasted data URL image');
+            
+            // Convert data URL to File/Blob
+            fetch(imageUrl)
+              .then(res => res.blob())
+              .then(blob => {
+                // Create a file from the blob
+                const extension = blob.type.split('/')[1] || 'png';
+                const fileName = `pasted-image-${Date.now()}.${extension}`;
+                const imageFile = new File([blob], fileName, { type: blob.type });
+
+                // Process the file using our shared function
+                processAndPreviewImage(imageFile);
+
+                // Try to remove the original pasted image
+                // Find and remove all images without our ID attribute
+                const currentContent = quill.getContents();
+                let index = 0;
+                
+                const removalDelta = new Delta();
+                
+                currentContent.ops?.forEach((contentOp: any) => {
+                  if (contentOp.insert && 
+                      typeof contentOp.insert === 'object' && 
+                      contentOp.insert.image && 
+                      contentOp.insert.image === imageUrl &&
+                      (!contentOp.attributes || !contentOp.attributes['data-pending-upload-id'])) {
+                    // Remove this image
+                    removalDelta.retain(index).delete(1);
+                    console.log('[text-change] Removing original pasted image at index', index);
+                  }
+                  
+                  // Increment index (1 for objects, length for strings)
+                  index += (typeof contentOp.insert === 'string') 
+                    ? contentOp.insert.length 
+                    : 1;
+                });
+                
+                // Apply removals if any were found
+                if (removalDelta.ops?.length > 0) {
+                  quill.updateContents(removalDelta, 'silent'); // Fix: use 'silent' instead of Quill.sources.SILENT
+                }
+              })
+              .catch(err => {
+                console.error("Error processing pasted image:", err);
+                setSnackbarMessage("Failed to process pasted image");
+                setShowSnackbar(true);
+              });
+          }
+        }
+      });
+    };
+
+    // Attach text-change listener
+    quill.on('text-change', handleTextChange);
+    console.log("[ContentEditor] Attached text-change listener for paste handling");
+
+    return () => {
+      quill.off('text-change', handleTextChange);
+      console.log("[ContentEditor] Removed text-change listener");
+    };
+  }, [processAndPreviewImage, setSnackbarMessage, setShowSnackbar]);
 
   useEffect(() => {
     if (quillRef.current) {
@@ -304,9 +566,11 @@ const ContentEditor: React.FC = () => {
     }
   }, [imageHandler]);
 
+  const handleCloseSnackbar = () => setShowSnackbar(false);
+
   return (
     <Container maxWidth="lg">
-      {initialDataLoading ? (
+      {initialDataLoading || isArticleLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
           <CircularProgress />
         </Box>
@@ -324,13 +588,33 @@ const ContentEditor: React.FC = () => {
               error={!!errors.title}
               helperText={errors.title?.message}
             />
+
+            {/* Short Description Input */}
+            <TextField
+              {...register("shortDescription")}
+              label="Short Description / Excerpt"
+              fullWidth
+              multiline
+              rows={3}
+              margin="normal"
+              helperText="A brief summary shown on article lists (optional)."
+              error={!!errors.shortDescription}
+            />
+
             <Box sx={{ 
               mt: 2, 
               mb: 3, 
               border: errors.content ? '1px solid #d32f2f' : '1px solid rgba(0, 0, 0, 0.23)', 
               borderRadius: 1,
               '.ql-editor': {
-                minHeight: '250px'
+                minHeight: '250px',
+                cursor: 'text',
+                pointerEvents: 'auto',
+                zIndex: 10
+              },
+              '.ql-container': {
+                pointerEvents: 'auto',
+                zIndex: 1
               }
             }}>
               <Controller
@@ -345,18 +629,20 @@ const ContentEditor: React.FC = () => {
                     return true;
                   }
                 }}
-                render={({ field: { onChange, value } }) => (
+                render={({ field }) => (
                   <ReactQuill
                     ref={quillRef}
                     theme="snow"
-                    value={value}
-                    onChange={onChange}
+                    value={field.value}
+                    onChange={field.onChange}
                     modules={quillModules}
                     placeholder="Write your article content here..."
                     style={{ 
                       height: '300px',
                       marginBottom: '50px'
                     }}
+                    readOnly={false}
+                    onFocus={() => console.log("Editor focused")}
                   />
                 )}
               />
@@ -377,12 +663,11 @@ const ContentEditor: React.FC = () => {
               control={control}
               render={({ field }) => (
                 <Autocomplete
-                  multiple // Allow multiple selections
-                  freeSolo // Allow arbitrary user input (not restricted to options)
-                  options={[]} // No predefined options needed for freeSolo
-                  value={field.value || []} // Controlled component value (ensure it's an array)
+                  multiple
+                  freeSolo
+                  options={[]}
+                  value={field.value || []}
                   onChange={(event, newValue) => {
-                    // newValue will be an array of strings (including new ones)
                     field.onChange(newValue);
                   }}
                   renderTags={(value: readonly string[], getTagProps) =>
@@ -436,16 +721,53 @@ const ContentEditor: React.FC = () => {
               )}
             />
             
-            <Box sx={{ mt: 2 }}>
+            {/* --- Status Control --- */}
+            <FormControl component="fieldset" margin="normal">
+              <FormLabel component="legend">Article Status</FormLabel>
+              <Controller
+                name="status"
+                control={control}
+                render={({ field }) => (
+                  <RadioGroup row {...field}>
+                    <FormControlLabel value="draft" control={<Radio />} label="Draft" />
+                    <FormControlLabel value="published" control={<Radio />} label="Published" />
+                  </RadioGroup>
+                )}
+              />
+            </FormControl>
+            
+            {/* Submit Buttons */}
+            <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+              {/* Save Draft Button */}
+              <Button
+                type="submit"
+                variant="outlined"
+                onClick={() => setValue('status', 'draft')}
+                disabled={loading || isUploadingImages || isCreating || isUpdating}
+              >
+                {loading && !isUploadingImages ? 
+                  <CircularProgress size={24} /> : 'Save Draft'}
+              </Button>
+              
+              {/* Publish Button */}
               <Button
                 type="submit"
                 variant="contained"
                 color="primary"
-                disabled={loading || initialDataLoading}
-                fullWidth
+                onClick={() => setValue('status', 'published')}
+                disabled={loading || isUploadingImages || isCreating || isUpdating}
               >
-                {loading ? <CircularProgress size={24} /> : (isEditing ? 'Update Article' : 'Save Draft')}
+                {loading && !isUploadingImages ? 
+                  <CircularProgress size={24} /> : 
+                  (isEditing ? 'Update & Publish' : 'Publish Now')}
               </Button>
+              
+              {isUploadingImages && 
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CircularProgress size={24} sx={{ mr: 1 }} />
+                  <Typography variant="caption">Uploading images...</Typography>
+                </Box>
+              }
             </Box>
           </form>
         </Paper>
@@ -460,4 +782,5 @@ const ContentEditor: React.FC = () => {
     </Container>
   );
 };
+
 export default ContentEditor;
